@@ -77,22 +77,34 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         refreshIcon()
         menuTargetApp = pause.frontmostOtherApp
 
+        // App items first (owner's order).
+        menu.addItem(item("Welcome & Permissions…", #selector(openWelcome)))
+        menu.addItem(item("About Zuntrio", #selector(showAbout)))
+        let settingsItem = item("Settings…", #selector(openSettings))
+        settingsItem.keyEquivalent = ","
+        menu.addItem(settingsItem)
+
+        // Disabling: the submenu, or how to turn the shortcuts back on.
+        menu.addItem(.separator())
+        if let until = pause.settings.pausedUntil, pause.isPausedNow {
+            menu.addItem(info("Shortcuts off until \(Self.format(until))"))
+            menu.addItem(item("Turn Shortcuts Back On", #selector(resume)))
+        } else {
+            let disable = NSMenuItem(title: "Disable Shortcuts", action: nil, keyEquivalent: "")
+            disable.submenu = disableMenu()
+            menu.addItem(disable)
+            if let app = menuTargetApp, pause.settings.isDisabled(bundleID: app.bundleID) {
+                menu.addItem(info("Shortcuts off in “\(app.name)”"))
+            }
+        }
+
+        // The rest: permission warning, window actions, status, quit.
+        menu.addItem(.separator())
         if !monitor.isTrusted {
             menu.addItem(info("Accessibility access needed"))
             menu.addItem(item("Grant Accessibility Access…", #selector(grantAccess)))
             menu.addItem(.separator())
         }
-        if let until = pause.settings.pausedUntil, pause.isPausedNow {
-            menu.addItem(info("Shortcuts off until \(Self.format(until))"))
-            menu.addItem(item("Turn Shortcuts Back On", #selector(resume)))
-            menu.addItem(.separator())
-        } else if let app = menuTargetApp, pause.settings.isDisabled(bundleID: app.bundleID) {
-            menu.addItem(info("Shortcuts off in “\(app.name)”"))
-            let on = item("Turn Back On in “\(app.name)”", #selector(toggleApp))
-            menu.addItem(on)
-            menu.addItem(.separator())
-        }
-
         for (index, section) in Self.sections.enumerated() {
             if index > 0 { menu.addItem(.separator()) }
             for action in section {
@@ -108,27 +120,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
         if !shortcuts.failures.isEmpty || !shortcuts.systemConflicts.isEmpty {
             let count = Set(shortcuts.failures.keys).union(shortcuts.systemConflicts).count
-            let warning = info("\(count) shortcut\(count == 1 ? "" : "s") unavailable — see Settings")
-            warning.image = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: "Warning")
-            menu.addItem(warning)
+            menu.addItem(info("\(count) shortcut\(count == 1 ? "" : "s") unavailable — see Settings"))
         }
 
         menu.addItem(.separator())
-        if !pause.isPausedNow {
-            let disable = NSMenuItem(title: "Disable Shortcuts", action: nil, keyEquivalent: "")
-            disable.submenu = disableMenu()
-            menu.addItem(disable)
-        }
-        let settingsItem = item("Settings…", #selector(openSettings))
-        settingsItem.keyEquivalent = ","
-        menu.addItem(settingsItem)
-        menu.addItem(item("Welcome & Permissions…", #selector(openWelcome)))
-        menu.addItem(item("About Zuntrio", #selector(showAbout)))
         #if DEBUG
         menu.addItem(item("Show Test Window", #selector(showFixture)))
         #endif
-
-        menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Zuntrio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
