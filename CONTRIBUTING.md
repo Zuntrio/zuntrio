@@ -56,8 +56,9 @@ open -n -g "$APP" --args --poc-run leftHalf,maximize,undo \
   --poc-target-pid <test window pid> --poc-output /tmp/result.json --poc-restore
 ```
 
-- `--poc-fixture-kind panel|dialog|minimized|sheet|ignore|ignore-later` shows window types
-  that Zuntrio should refuse or handle specially.
+- `--poc-fixture-kind panel|dialog|minimized|sheet|ignore|ignore-later|delayed` shows window
+  types that Zuntrio should refuse or handle specially. `delayed` reports its old frame for
+  40 ms after a change; add `--poc-no-settle` to compare results without the second read.
 - `--poc-fixture-hang <delay>,<seconds>` simulates an app that stops responding.
 - Results are JSON with geometry only.
 - Never point the harness at a window you are working in.

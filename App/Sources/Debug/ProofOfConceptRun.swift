@@ -243,6 +243,15 @@ enum ProofOfConceptRun {
             if kind == "ignore-later" {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 6) { IgnoringWindow.ignoring = true }
             }
+        case "delayed":
+            // A window that applies frame changes 40 ms late, like some apps do.
+            let window = DelayedWindow(contentRect: NSRect(x: 250, y: 250, width: 640, height: 420),
+                                       styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            window.title = "Zuntrio Delayed Window"
+            window.isReleasedWhenClosed = false
+            window.makeKeyAndOrderFront(nil)
+            DelayedWindow.delaying = true
+            extraWindows.append(window)
         case "sheet":
             let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 150),
                                  styleMask: [.titled], backing: .buffered, defer: false)
@@ -261,6 +270,34 @@ enum ProofOfConceptRun {
         }
         override func setFrameOrigin(_ point: NSPoint) {
             if !Self.ignoring { super.setFrameOrigin(point) }
+        }
+    }
+
+    /// Applies frame changes at once but keeps reporting its previous frame to
+    /// Accessibility for 40 ms, like apps that update asynchronously.
+    private final class DelayedWindow: NSWindow {
+        nonisolated(unsafe) static var delaying = false
+        private var staleFrame: NSRect?
+        private var staleUntil = Date.distantPast
+
+        override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+            let previous = frame
+            super.setFrame(frameRect, display: flag)
+            markStale(previous)
+        }
+        override func setFrameOrigin(_ point: NSPoint) {
+            let previous = frame
+            super.setFrameOrigin(point)
+            markStale(previous)
+        }
+        private func markStale(_ previous: NSRect) {
+            guard Self.delaying else { return }
+            if Date() >= staleUntil { staleFrame = previous }
+            staleUntil = Date().addingTimeInterval(0.04)
+        }
+        override func accessibilityFrame() -> NSRect {
+            if Date() < staleUntil, let staleFrame { return staleFrame }
+            return super.accessibilityFrame()
         }
     }
 

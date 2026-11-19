@@ -84,7 +84,29 @@ final class AXWindow: ManagedWindow, @unchecked Sendable {
         try AX.setPoint(element, target.origin)
         try AX.setSize(element, target.size)
 
+        // Some apps apply frame changes asynchronously, so an immediate read can
+        // still show the old frame. If it doesn't match yet, give the app one
+        // short moment and read again. This runs on the AX worker queue, never
+        // the main thread, and only on a mismatch, so normal moves aren't slowed.
+        let first = try frame()
+        guard !Self.matches(first, target), !Self.settleDisabledForTesting else { return first }
+        Thread.sleep(forTimeInterval: Self.settleDelay)
         return try frame()
+    }
+
+    /// About three display refreshes; enough for apps that apply frames on the next run-loop turn.
+    static let settleDelay: TimeInterval = 0.05
+
+    #if DEBUG
+    /// `--poc-no-settle`: compare results without the second read.
+    static let settleDisabledForTesting = CommandLine.arguments.contains("--poc-no-settle")
+    #else
+    static let settleDisabledForTesting = false
+    #endif
+
+    private static func matches(_ a: CGRect, _ b: CGRect) -> Bool {
+        abs(a.minX - b.minX) <= 1 && abs(a.minY - b.minY) <= 1
+            && abs(a.width - b.width) <= 1 && abs(a.height - b.height) <= 1
     }
 }
 

@@ -6,6 +6,8 @@ import ZuntrioCore
 @MainActor
 final class ShortcutController {
     private static let defaultsKey = "shortcuts"
+    /// Where unreadable stored settings are copied before anything overwrites them.
+    static let backupKey = "shortcuts.unreadableBackup"
 
     private let hotKeys: HotKeyCenter
     private let defaults: UserDefaults
@@ -34,7 +36,10 @@ final class ShortcutController {
                 isReadOnly = true
                 Log.shortcuts.error("Shortcut settings are from a newer version (\(version)); using defaults without saving")
             case .corrupt:
-                Log.shortcuts.error("Stored shortcut settings are unreadable; using defaults")
+                // Keep the unreadable data before the first change overwrites it,
+                // so a bug or a hand edit never silently loses someone's setup.
+                defaults.set(data, forKey: Self.backupKey)
+                Log.shortcuts.error("Stored shortcut settings are unreadable; using defaults (original kept under \(Self.backupKey, privacy: .public))")
             }
         }
     }
