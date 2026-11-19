@@ -50,8 +50,8 @@ that keeps working after that change.
 
 ## Install
 
-1. Download `Zuntrio.zip` from the [Releases](https://github.com/Zuntrio) page *(available
-   with the first beta)*.
+1. Download `Zuntrio.zip` from the [Releases](https://github.com/Zuntrio/zuntrio/releases) page.
+   The current version is 0.1.0 beta 1. It's a Universal app, signed and notarized by Apple.
 2. Unzip it and move **Zuntrio** to your **Applications** folder.
 3. Open Zuntrio. Its icon appears in the menu bar. There is no Dock icon.
 4. Grant Accessibility access when asked (see below).
