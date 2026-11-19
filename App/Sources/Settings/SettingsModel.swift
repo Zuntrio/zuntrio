@@ -117,7 +117,11 @@ final class SettingsModel {
         // arrives as a normal key press below.
         shortcuts.beginCapture { [weak self] combo in
             Log.settings.info("Recording received a key press (registered shortcut)")
-            self?.record(combo)
+            // Re-registering happens in `record`; do it after the Carbon
+            // callback for this hotkey has returned.
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.record(combo) }
+            }
         }
         // Recording events are logged without the keys pressed.
         Log.settings.info("Recording started for \(action.rawValue, privacy: .public); app active=\(NSApp.isActive), key window=\(NSApp.keyWindow != nil)")

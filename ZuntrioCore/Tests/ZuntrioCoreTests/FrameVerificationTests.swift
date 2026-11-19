@@ -43,4 +43,12 @@ import Testing
         #expect(FrameVerification.outcome(before: before, requested: far, actual: before)
                 == .ignored(requested: far, actual: before))
     }
+
+    @Test func onlyIgnoredOutcomesAreNotAccepted() {
+        let r = CGRect(x: 0, y: 0, width: 1, height: 1)
+        #expect(FrameOutcome.exact.isAccepted)
+        #expect(FrameOutcome.clamped(requested: r, actual: r).isAccepted)
+        #expect(FrameOutcome.alreadyClosest(requested: r, actual: r).isAccepted)
+        #expect(!FrameOutcome.ignored(requested: r, actual: r).isAccepted)
+    }
 }

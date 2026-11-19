@@ -10,18 +10,17 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     private static let completedKey = "onboardingCompletedVersion"
 
     private let monitor: AccessibilityMonitor
+    private let shortcuts: ShortcutController
     private let defaults: UserDefaults
+    private static let exampleActions: [WindowAction] = [.leftHalf, .rightHalf, .maximize, .center, .nextDisplay]
     private let model: OnboardingModel
     private var window: NSWindow?
 
     init(monitor: AccessibilityMonitor, shortcuts: ShortcutController, defaults: UserDefaults = .standard) {
         self.monitor = monitor
+        self.shortcuts = shortcuts
         self.defaults = defaults
-        let examples: [WindowAction] = [.leftHalf, .rightHalf, .maximize, .center, .nextDisplay]
-        model = OnboardingModel(
-            isTrusted: monitor.isTrusted,
-            examples: examples.map { ($0.displayName, shortcuts.combo(for: $0)?.displayString ?? "—") }
-        )
+        model = OnboardingModel(isTrusted: monitor.isTrusted, examples: [])
         super.init()
         model.openSettings = {
             if !AccessibilityPermission.requestTrustPrompt() {
@@ -44,6 +43,8 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
 
     func show() {
         model.isTrusted = monitor.isTrusted
+        // Shortcuts may have changed in Settings since launch.
+        model.examples = Self.exampleActions.map { ($0.displayName, shortcuts.combo(for: $0)?.displayString ?? "—") }
         let window = self.window ?? makeWindow()
         self.window = window
         monitor.setPolling(!model.isTrusted)

@@ -30,7 +30,7 @@ struct ActionReport: Sendable, Equatable {
         case .clamped:
             "\(action.displayName): app limited the size (asked \(Self.size(requested)), got \(Self.size(actual)))"
         case .ignored:
-            "\(action.displayName): app ignored the change"
+            "\(action.displayName): the app didn't move or resize the window (it may be at its size limit)"
         case .alreadyInPlace:
             "\(action.displayName): already in place"
         case .nothingToDo:
@@ -75,7 +75,9 @@ final class WindowActionRunner {
     private(set) var droppedCount = 0
     var onReport: ((ActionReport) -> Void)?
 
-    private var queue: [(action: WindowAction, done: CheckedContinuation<ActionReport, Never>?)] = []
+    /// Each queued action keeps the app that was frontmost when it was
+    /// pressed, so a quick ⌘Tab afterwards can't redirect it.
+    private var queue: [(action: WindowAction, pid: pid_t?, done: CheckedContinuation<ActionReport, Never>?)] = []
     private(set) var isBusy = false
 
     /// Last action applied, for cycling. Only one window is remembered:
@@ -109,7 +111,7 @@ final class WindowActionRunner {
             done?.resume(returning: report)
             return
         }
-        queue.append((action, done))
+        queue.append((action, targetPID ?? NSWorkspace.shared.frontmostApplication?.processIdentifier, done))
         guard !isBusy else { return }
         isBusy = true
         Task { await drain() }
@@ -117,8 +119,8 @@ final class WindowActionRunner {
 
     private func drain() async {
         while !queue.isEmpty {
-            let (action, done) = queue.removeFirst()
-            let report = await run(action)
+            let (action, pid, done) = queue.removeFirst()
+            let report = await run(action, pid: pid)
             finish(report)
             done?.resume(returning: report)
         }
@@ -132,12 +134,10 @@ final class WindowActionRunner {
         onReport?(report)
     }
 
-    private func run(_ action: WindowAction) async -> ActionReport {
+    private func run(_ action: WindowAction, pid: pid_t?) async -> ActionReport {
         do throws(WindowAccessError) {
             guard AccessibilityPermission.isTrusted else { throw .notTrusted }
-            guard let pid = targetPID ?? NSWorkspace.shared.frontmostApplication?.processIdentifier else {
-                throw .noFrontmostApplication
-            }
+            guard let pid else { throw .noFrontmostApplication }
             let provider = self.provider
             let snapshot = try await worker.run { () throws(WindowAccessError) -> WindowSnapshot in
                 let window = try provider.focusedWindow(pid: pid)
@@ -176,15 +176,18 @@ final class WindowActionRunner {
             let actual = try await worker.run { () throws(WindowAccessError) -> CGRect in
                 try window.setFrame(target)
             }
-            memory = (window.identity, LayoutMemory(
-                action: action, cycleIndex: layout.cycleIndex, requestedFrame: target, resultingFrame: actual
-            ))
-
-            let result = Self.result(before: before, requested: target, actual: actual)
-            if result == .exact || result == .clamped {
-                history.record(.init(before: before, after: actual), for: window.identity)
+            let outcome = FrameVerification.outcome(before: before, requested: target, actual: actual)
+            // An ignored request is not remembered: the next press must try the
+            // AX call again rather than report "already in place".
+            if outcome.isAccepted {
+                memory = (window.identity, LayoutMemory(
+                    action: action, cycleIndex: layout.cycleIndex, requestedFrame: target, resultingFrame: actual
+                ))
+                if !LayoutEngine.approximatelyEqual(before, actual, tolerance: 1) {
+                    history.record(.init(before: before, after: actual), for: window.identity)
+                }
             }
-            return ActionReport(action: action, result: result, before: before, requested: target, actual: actual)
+            return ActionReport(action: action, result: Self.result(outcome), before: before, requested: target, actual: actual)
         } catch {
             return ActionReport(action: action, result: .failed(error))
         }
@@ -215,11 +218,10 @@ final class WindowActionRunner {
         let actual = try await worker.run { () throws(WindowAccessError) -> CGRect in
             try window.setFrame(target)
         }
-        commit()
-        return ActionReport(
-            action: action, result: Self.result(before: before, requested: target, actual: actual),
-            before: before, requested: target, actual: actual
-        )
+        let outcome = FrameVerification.outcome(before: before, requested: target, actual: actual)
+        // Keep the entry if the app ignored the restore, so undo/redo can be retried.
+        if outcome.isAccepted { commit() }
+        return ActionReport(action: action, result: Self.result(outcome), before: before, requested: target, actual: actual)
     }
 
     #if DEBUG
@@ -235,8 +237,8 @@ final class WindowActionRunner {
     }
     #endif
 
-    private static func result(before: CGRect, requested: CGRect, actual: CGRect) -> ActionReport.Result {
-        switch FrameVerification.outcome(before: before, requested: requested, actual: actual) {
+    private static func result(_ outcome: FrameOutcome) -> ActionReport.Result {
+        switch outcome {
         case .exact: .exact
         case .clamped: .clamped
         case .ignored: .ignored

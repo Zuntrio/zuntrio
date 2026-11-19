@@ -231,6 +231,18 @@ enum ProofOfConceptRun {
             extraWindows.append(dialog)
         case "minimized":
             main.window.miniaturize(nil)
+        case "ignore", "ignore-later":
+            // A window that silently ignores frame changes (like a busy app).
+            let window = IgnoringWindow(contentRect: NSRect(x: 250, y: 250, width: 640, height: 420),
+                                        styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            window.title = "Zuntrio Ignoring Window"
+            window.isReleasedWhenClosed = false
+            window.makeKeyAndOrderFront(nil)
+            extraWindows.append(window)
+            IgnoringWindow.ignoring = kind == "ignore"
+            if kind == "ignore-later" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 6) { IgnoringWindow.ignoring = true }
+            }
         case "sheet":
             let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 150),
                                  styleMask: [.titled], backing: .buffered, defer: false)
@@ -239,6 +251,16 @@ enum ProofOfConceptRun {
             main.window.beginSheet(sheet)
         default:
             break
+        }
+    }
+
+    private final class IgnoringWindow: NSWindow {
+        nonisolated(unsafe) static var ignoring = false
+        override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+            if !Self.ignoring { super.setFrame(frameRect, display: flag) }
+        }
+        override func setFrameOrigin(_ point: NSPoint) {
+            if !Self.ignoring { super.setFrameOrigin(point) }
         }
     }
 

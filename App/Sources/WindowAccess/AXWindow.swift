@@ -93,7 +93,7 @@ enum AX {
     static func copyAttribute(_ element: AXUIElement, _ attribute: String) throws(WindowAccessError) -> CFTypeRef {
         var value: CFTypeRef?
         let error = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
-        if error == .cannotComplete { throw .appNotResponding }
+        try throwIfFatal(error)
         guard error == .success, let value else {
             let code = error == .success ? AXError.noValue.rawValue : error.rawValue
             throw .accessibilityFailure(operation: "Read \(attribute)", code: code)
@@ -159,7 +159,7 @@ enum AX {
 
     private static func set(_ element: AXUIElement, _ attribute: String, _ value: CFTypeRef) throws(WindowAccessError) {
         let error = AXUIElementSetAttributeValue(element, attribute as CFString, value)
-        if error == .cannotComplete { throw .appNotResponding }
+        try throwIfFatal(error)
         guard error == .success else {
             throw .accessibilityFailure(operation: "Set \(attribute)", code: error.rawValue)
         }
@@ -168,11 +168,23 @@ enum AX {
     static func isSettable(_ element: AXUIElement, _ attribute: String) throws(WindowAccessError) -> Bool {
         var settable: DarwinBoolean = false
         let error = AXUIElementIsAttributeSettable(element, attribute as CFString, &settable)
-        if error == .cannotComplete { throw .appNotResponding }
-        if error != .success {
-            Log.accessibility.debug("IsSettable \(attribute, privacy: .public) returned AXError \(error.rawValue)")
+        try throwIfFatal(error)
+        switch error {
+        case .success: return settable.boolValue
+        case .attributeUnsupported, .noValue: return false
+        // e.g. the window closed mid-action: report the real cause.
+        default: throw .accessibilityFailure(operation: "Check \(attribute)", code: error.rawValue)
         }
-        return error == .success && settable.boolValue
+    }
+
+    /// Errors that end the action whatever call produced them: the app timed
+    /// out, or Accessibility access was revoked mid-action.
+    static func throwIfFatal(_ error: AXError) throws(WindowAccessError) {
+        switch error {
+        case .cannotComplete: throw .appNotResponding
+        case .apiDisabled: throw .notTrusted
+        default: break
+        }
     }
 
     /// Reads an attribute that may legitimately be missing. Returns nil when
@@ -181,7 +193,7 @@ enum AX {
     private static func optionalValue(_ element: AXUIElement, _ attribute: String) throws(WindowAccessError) -> CFTypeRef? {
         var value: CFTypeRef?
         let error = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
-        if error == .cannotComplete { throw .appNotResponding }
+        try throwIfFatal(error)
         return error == .success ? value : nil
     }
 
@@ -201,7 +213,9 @@ enum AX {
     /// whether the move worked.
     static func rejectUnsupported(_ window: AXUIElement) throws(WindowAccessError) {
         if let subrole = try string(window, kAXSubroleAttribute), subrole != kAXStandardWindowSubrole {
-            throw .unsupportedWindow(reason: "subrole \(subrole)")
+            // The subrole string comes from the target app; only name known
+            // system values so app-provided text never reaches the logs.
+            throw .unsupportedWindow(reason: knownSubroles[subrole] ?? "non-standard window")
         }
         if try bool(window, kAXMinimizedAttribute) == true {
             throw .unsupportedWindow(reason: "minimized")
@@ -212,6 +226,14 @@ enum AX {
             throw .unsupportedWindow(reason: "full screen")
         }
     }
+
+    private static let knownSubroles: [String: String] = [
+        kAXDialogSubrole: "dialog",
+        kAXSystemDialogSubrole: "system dialog",
+        kAXFloatingWindowSubrole: "floating panel",
+        kAXSystemFloatingWindowSubrole: "floating panel",
+        kAXUnknownSubrole: "unknown window type",
+    ]
 
     private static let enhancedUserInterface = "AXEnhancedUserInterface"
 

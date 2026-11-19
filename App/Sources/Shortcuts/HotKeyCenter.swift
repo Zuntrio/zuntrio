@@ -20,7 +20,7 @@ enum HotKeyError: Error, CustomStringConvertible {
 @MainActor
 final class HotKeyCenter {
     /// Four-char code 'ZNTR' identifying our hotkeys.
-    private static let signature: OSType = 0x5A4E_5452
+    nonisolated fileprivate static let signature: OSType = 0x5A4E_5452
 
     private var handlers: [UInt32: () -> Void] = [:]
     private var references: [UInt32: EventHotKeyRef] = [:]
@@ -73,12 +73,15 @@ final class HotKeyCenter {
         }
     }
 
-    fileprivate func handle(id: UInt32) {
+    /// Returns false for ids that aren't (or are no longer) registered.
+    fileprivate func handle(id: UInt32) -> Bool {
         if let interceptor, let combo = combos[id] {
             interceptor(combo.keyCode, combo.modifiers)
-        } else {
-            handlers[id]?()
+            return true
         }
+        guard let handler = handlers[id] else { return false }
+        handler()
+        return true
     }
 
     private func installEventHandlerIfNeeded() throws(HotKeyError) {
@@ -101,9 +104,11 @@ private func hotKeyCallback(_: EventHandlerCallRef?, event: EventRef?, _: Unsafe
         nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID
     )
     guard status == noErr else { return status }
+    // Only handle our own hotkeys; leave anything else to other handlers.
+    guard hotKeyID.signature == HotKeyCenter.signature else { return OSStatus(eventNotHandledErr) }
     let id = hotKeyID.id
-    MainActor.assumeIsolated {
-        HotKeyCenter.active?.handle(id: id)
+    let handled = MainActor.assumeIsolated {
+        HotKeyCenter.active?.handle(id: id) ?? false
     }
-    return noErr
+    return handled ? noErr : OSStatus(eventNotHandledErr)
 }

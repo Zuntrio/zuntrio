@@ -16,6 +16,18 @@ public enum FrameOutcome: Sendable, Equatable {
     case alreadyClosest(requested: CGRect, actual: CGRect)
 }
 
+extension FrameOutcome {
+    /// Whether the window now is where this action leaves it: exactly, or as
+    /// close as the app allows. Only accepted outcomes may update cycle memory
+    /// or move undo/redo history; an ignored request must be retried in full.
+    public var isAccepted: Bool {
+        switch self {
+        case .exact, .clamped, .alreadyClosest: true
+        case .ignored: false
+        }
+    }
+}
+
 public enum FrameVerification {
     /// Default tolerance in points. AX positions are integral in practice;
     /// one point absorbs rounding differences between apps.
