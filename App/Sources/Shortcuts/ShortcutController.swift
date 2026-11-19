@@ -21,6 +21,9 @@ final class ShortcutController {
     private(set) var failures: [WindowAction: String] = [:]
     /// Actions whose shortcut matches an enabled macOS shortcut.
     private(set) var systemConflicts: Set<WindowAction> = []
+    /// While true (shortcuts disabled), no hotkeys are registered, so the keys
+    /// reach the app in front instead.
+    private(set) var isSuspended = false
 
     init(hotKeys: HotKeyCenter, defaults: UserDefaults = .standard, perform: @escaping (WindowAction) -> Void) {
         self.hotKeys = hotKeys
@@ -79,9 +82,20 @@ final class ShortcutController {
         hotKeys.interceptor = nil
     }
 
-    /// Unregisters everything and registers the current bindings again.
+    /// Number of hotkeys currently registered with the system.
+    var registeredCount: Int { hotKeys.registeredCount }
+
+    func setSuspended(_ suspended: Bool) {
+        guard suspended != isSuspended else { return }
+        isSuspended = suspended
+        apply()
+    }
+
+    /// Unregisters everything and registers the current bindings again
+    /// (or nothing while suspended).
     func apply() {
         hotKeys.unregisterAll()
+        guard !isSuspended else { return }
         failures = [:]
         for (action, combo) in settings.effectiveBindings.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
             do {

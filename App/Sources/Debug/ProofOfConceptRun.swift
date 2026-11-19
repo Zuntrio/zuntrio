@@ -27,7 +27,7 @@ enum ProofOfConceptRun {
 
     /// `--poc-shortcut-report <path>` writes registration results and macOS
     /// shortcut conflicts for every preset, then quits.
-    static func writeShortcutReportIfRequested(arguments: [String], shortcuts: ShortcutController) {
+    static func writeShortcutReportIfRequested(arguments: [String], shortcuts: ShortcutController, pause: PauseController) {
         guard let output = value(after: "--poc-shortcut-report", in: arguments) else { return }
         // Optional settings changes through the real controller (and so the
         // real persistence path): "preset:alternative", "disable:center",
@@ -39,6 +39,10 @@ enum ProofOfConceptRun {
             case ("disable", let name?): WindowAction(rawValue: name).map { shortcuts.setEnabled(false, for: $0) }
             case ("enable", let name?): WindowAction(rawValue: name).map { shortcuts.setEnabled(true, for: $0) }
             case ("restore", _): shortcuts.restoreDefaults()
+            case ("pause", let hours?): Int(hours).map(pause.pause)
+            case ("resume", _): pause.resume()
+            case ("disable-app", let bundleID?): pause.disable(PauseSettings.DisabledApp(bundleID: bundleID, name: bundleID))
+            case ("enable-app", let bundleID?): pause.enable(bundleID: bundleID)
             default: break
             }
         }
@@ -50,6 +54,11 @@ enum ProofOfConceptRun {
         }
         write([
             "activePreset": shortcuts.settings.preset.rawValue,
+            "suspended": shortcuts.isSuspended,
+            "shortcutsActive": pause.shortcutsActive,
+            "pausedUntil": pause.settings.pausedUntil.map { "\($0)" } ?? "none",
+            "disabledApps": pause.settings.disabledApps.map(\.bundleID),
+            "registeredHotKeys": shortcuts.registeredCount,
             "disabled": WindowAction.allCases.filter { !shortcuts.settings.isEnabled($0) }.map(\.rawValue),
             "registered": shortcuts.settings.effectiveBindings.count - shortcuts.failures.count,
             "failures": shortcuts.failures.map { "\($0.key.rawValue): \($0.value)" },

@@ -27,8 +27,14 @@ final class SettingsModel {
     ]
 
     private let shortcuts: ShortcutController
+    private let pause: PauseController
     private let monitor: AccessibilityMonitor
     private var keyMonitor: Any?
+
+    // Disable shortcuts
+    private(set) var pausedUntil: Date?
+    private(set) var disabledApps: [PauseSettings.DisabledApp] = []
+    var pauseHours = 2
 
     private(set) var rows: [WindowAction: Row] = [:]
     private(set) var preset: ShortcutPreset = .spectacle
@@ -40,8 +46,9 @@ final class SettingsModel {
     private(set) var launchAtLoginError: String?
     private(set) var isTrusted = false
 
-    init(shortcuts: ShortcutController, monitor: AccessibilityMonitor) {
+    init(shortcuts: ShortcutController, pause: PauseController, monitor: AccessibilityMonitor) {
         self.shortcuts = shortcuts
+        self.pause = pause
         self.monitor = monitor
         reload()
     }
@@ -72,6 +79,8 @@ final class SettingsModel {
             )
         }
         launchAtLogin = LaunchAtLogin.state
+        pausedUntil = pause.isPausedNow ? pause.settings.pausedUntil : nil
+        disabledApps = pause.settings.disabledApps
         monitor.refresh()
         isTrusted = monitor.isTrusted
     }
@@ -191,6 +200,43 @@ final class SettingsModel {
         case .usedByAction(let other): "\(combo.displayString) is already used by \(other.displayName)."
         case .reservedBySystem: "\(combo.displayString) is a macOS shortcut."
         }
+    }
+
+    // MARK: - Disable shortcuts
+
+    var pausedUntilText: String? {
+        pausedUntil.map(StatusMenuController.format)
+    }
+
+    func pauseNow() {
+        pause.pause(hours: pauseHours)
+        reload()
+    }
+
+    func resume() {
+        pause.resume()
+        reload()
+    }
+
+    func removeDisabledApp(_ bundleID: String) {
+        pause.enable(bundleID: bundleID)
+        reload()
+    }
+
+    /// Lets the person pick an app whose window should never get Zuntrio's shortcuts.
+    func addDisabledApp() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose an App"
+        panel.message = "Zuntrio's shortcuts will be off while this app is in front."
+        panel.prompt = "Add"
+        panel.allowedContentTypes = [.applicationBundle]
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        guard panel.runModal() == .OK, let url = panel.url,
+              let bundle = Bundle(url: url), let bundleID = bundle.bundleIdentifier else { return }
+        let name = FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+        pause.disable(PauseSettings.DisabledApp(bundleID: bundleID, name: name))
+        reload()
     }
 
     // MARK: - General

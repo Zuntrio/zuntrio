@@ -2,15 +2,18 @@ import AppKit
 import ZuntrioCore
 
 /// Menu-bar item and its menu. The menu is rebuilt each time it opens so the
-/// permission and shortcut state are always current.
+/// permission, shortcut and disable state are always current.
 @MainActor
 final class StatusMenuController: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let runner: WindowActionRunner
     private let shortcuts: ShortcutController
+    private let pause: PauseController
     private let monitor: AccessibilityMonitor
     private let showWelcome: () -> Void
     private let showSettings: () -> Void
+    /// The app that was in front when the menu opened (target of "Disable in …").
+    private var menuTargetApp: PauseSettings.DisabledApp?
     #if DEBUG
     private lazy var fixture = FixtureWindowController()
     #endif
@@ -26,10 +29,11 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         [.undo, .redo],
     ]
 
-    init(runner: WindowActionRunner, shortcuts: ShortcutController, monitor: AccessibilityMonitor,
-         showWelcome: @escaping () -> Void, showSettings: @escaping () -> Void) {
+    init(runner: WindowActionRunner, shortcuts: ShortcutController, pause: PauseController,
+         monitor: AccessibilityMonitor, showWelcome: @escaping () -> Void, showSettings: @escaping () -> Void) {
         self.runner = runner
         self.shortcuts = shortcuts
+        self.pause = pause
         self.monitor = monitor
         self.showWelcome = showWelcome
         self.showSettings = showSettings
@@ -47,84 +51,160 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false
         statusItem.menu = menu
-        trustChanged(monitor.isTrusted)
+        refreshIcon()
     }
 
-    /// Dims the menu-bar icon while Accessibility access is missing.
-    func trustChanged(_ trusted: Bool) {
-        statusItem.button?.appearsDisabled = !trusted
-        statusItem.button?.toolTip = trusted ? "Zuntrio" : "Zuntrio needs Accessibility access"
+    /// Dims the menu-bar icon while Accessibility access is missing or the
+    /// shortcuts are switched off.
+    func refreshIcon() {
+        let trusted = monitor.isTrusted
+        statusItem.button?.appearsDisabled = !trusted || !pause.shortcutsActive
+        statusItem.button?.toolTip = if !trusted {
+            "Zuntrio needs Accessibility access"
+        } else if !pause.shortcutsActive {
+            "Zuntrio shortcuts are off"
+        } else {
+            "Zuntrio"
+        }
     }
+
+    // MARK: - Building the menu
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         monitor.refresh()
-        let trusted = monitor.isTrusted
+        pause.evaluate()
+        refreshIcon()
+        menuTargetApp = pause.frontmostOtherApp
 
-        menu.addItem(info(trusted ? "Accessibility: granted" : "Accessibility: not granted"))
-        if !trusted {
-            menu.addItem(item("Grant Accessibility Access…", #selector(grantAccess)))
-            menu.addItem(info("Or open \(AccessibilityPermission.manualPath)"))
-        }
+        // App items first (owner's order).
+        menu.addItem(item("Welcome & Permissions…", #selector(openWelcome), symbol: "checkmark.shield"))
+        menu.addItem(item("About Zuntrio", #selector(showAbout), symbol: "info.circle"))
+        let settingsItem = item("Settings…", #selector(openSettings), symbol: "gearshape")
+        settingsItem.keyEquivalent = ","
+        menu.addItem(settingsItem)
 
-        for section in Self.sections {
-            menu.addItem(.separator())
-            for action in section {
-                let menuItem = actionItem(action, title: action.displayName, selector: #selector(runAction(_:)))
-                menu.addItem(menuItem)
+        // Disabling: the submenu, or how to turn the shortcuts back on.
+        menu.addItem(.separator())
+        if let until = pause.settings.pausedUntil, pause.isPausedNow {
+            menu.addItem(info("Shortcuts off until \(Self.format(until))"))
+            menu.addItem(item("Turn Shortcuts Back On", #selector(resume)))
+        } else {
+            let disable = NSMenuItem(title: "Disable Shortcuts", action: nil, keyEquivalent: "")
+            Self.setIcon(Self.symbol("pause.circle"), on: disable)
+            disable.submenu = disableMenu()
+            menu.addItem(disable)
+            if let app = menuTargetApp, pause.settings.isDisabled(bundleID: app.bundleID) {
+                menu.addItem(info("Shortcuts off in “\(app.name)”"))
             }
         }
 
+        // The rest: permission warning, window actions, status, quit.
         menu.addItem(.separator())
-        let settingsItem = item("Settings…", #selector(openSettings))
-        settingsItem.keyEquivalent = ","
-        menu.addItem(settingsItem)
-        if !shortcuts.failures.isEmpty {
-            menu.addItem(info("⚠︎ \(shortcuts.failures.count) shortcut(s) in use by another app"))
+        if !monitor.isTrusted {
+            menu.addItem(info("Accessibility access needed"))
+            menu.addItem(item("Grant Accessibility Access…", #selector(grantAccess)))
+            menu.addItem(.separator())
         }
-        if !shortcuts.systemConflicts.isEmpty {
-            menu.addItem(info("⚠︎ \(shortcuts.systemConflicts.count) shortcut(s) also used by macOS"))
+        for (index, section) in Self.sections.enumerated() {
+            if index > 0 { menu.addItem(.separator()) }
+            for action in section {
+                menu.addItem(actionItem(action))
+            }
         }
-        menu.addItem(info("Last: " + (runner.lastReport?.summary ?? "none")))
+
+        if let report = runner.lastReport, report.result != .exact {
+            menu.addItem(.separator())
+            let last = info(Self.truncated(report.summary, to: 44))
+            last.toolTip = report.summary
+            menu.addItem(last)
+        }
+        if !shortcuts.failures.isEmpty || !shortcuts.systemConflicts.isEmpty {
+            let count = Set(shortcuts.failures.keys).union(shortcuts.systemConflicts).count
+            menu.addItem(info("\(count) shortcut\(count == 1 ? "" : "s") unavailable — see Settings"))
+        }
 
         menu.addItem(.separator())
-        menu.addItem(item("Welcome & Permissions…", #selector(openWelcome)))
-        menu.addItem(item("About Zuntrio", #selector(showAbout)))
         #if DEBUG
         menu.addItem(item("Show Test Window", #selector(showFixture)))
         #endif
+        let quit = NSMenuItem(title: "Quit Zuntrio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        Self.setIcon(Self.symbol("power"), on: quit)
+        menu.addItem(quit)
 
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit Zuntrio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
-    // MARK: - Items
+    /// Shortcuts are global hotkeys; the menu only displays them. Pressing one
+    /// while the menu is open must not trigger the item a second time.
+    func menuHasKeyEquivalent(
+        _ menu: NSMenu, for event: NSEvent, target: AutoreleasingUnsafeMutablePointer<AnyObject?>,
+        action: UnsafeMutablePointer<Selector?>
+    ) -> Bool {
+        false
+    }
 
-    /// An action item with its global shortcut (and any problem) in a
-    /// right-aligned column. Shortcuts are shown as text, not key equivalents:
-    /// key equivalents would only fire while the menu is open.
-    private func actionItem(_ action: WindowAction, title: String, selector: Selector) -> NSMenuItem {
-        var detail = shortcuts.combo(for: action)?.displayString ?? "—"
-        if shortcuts.failures[action] != nil {
-            detail += "  ⚠︎ in use by another app"
-        } else if shortcuts.systemConflicts.contains(action) {
-            detail += "  ⚠︎ also a macOS shortcut"
+    private func disableMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(item("For 1 Hour", #selector(disableForAnHour)))
+        menu.addItem(item("For Several Hours…", #selector(disableForHours)))
+        if let app = menuTargetApp {
+            menu.addItem(.separator())
+            let appItem = item("In “\(app.name)”", #selector(toggleApp))
+            appItem.state = pause.settings.isDisabled(bundleID: app.bundleID) ? .on : .off
+            appItem.toolTip = "Always off while \(app.name) is in front"
+            menu.addItem(appItem)
         }
-        let text = "\(title)\t\(detail)"
-        let menuItem = item(text, selector)
+        return menu
+    }
+
+    private func actionItem(_ action: WindowAction) -> NSMenuItem {
+        let menuItem = item(action.displayName, #selector(runAction(_:)))
         menuItem.representedObject = action.rawValue
-        let style = NSMutableParagraphStyle()
-        style.tabStops = [NSTextTab(textAlignment: .left, location: 160)]
-        menuItem.attributedTitle = NSAttributedString(
-            string: text, attributes: [.paragraphStyle: style, .font: NSFont.menuFont(ofSize: 0)]
-        )
+        Self.setIcon(Self.icon(for: action), on: menuItem)
+        MenuKeyEquivalent.apply(shortcuts.combo(for: action), to: menuItem)
+        if shortcuts.failures[action] != nil {
+            menuItem.toolTip = "This shortcut is in use by another app. Change it in Settings."
+        } else if shortcuts.systemConflicts.contains(action) {
+            menuItem.toolTip = "This shortcut is also a macOS keyboard shortcut."
+        }
         return menuItem
     }
 
-    private func item(_ title: String, _ selector: Selector) -> NSMenuItem {
+    private func item(_ title: String, _ selector: Selector, symbol: String? = nil) -> NSMenuItem {
         let menuItem = NSMenuItem(title: title, action: selector, keyEquivalent: "")
         menuItem.target = self
+        Self.setIcon(symbol.flatMap(Self.symbol), on: menuItem)
         return menuItem
+    }
+
+    // MARK: - Icons (owner-approved 2026-11-19)
+
+    /// Zuntrio's own glyph for a window action (Assets: "Menu-<action>"), or an
+    /// SF Symbol for undo/redo. Template images, tinted by the menu.
+    static func icon(for action: WindowAction) -> NSImage? {
+        switch action {
+        case .undo: return symbol("arrow.uturn.backward")
+        case .redo: return symbol("arrow.uturn.forward")
+        default:
+            let image = NSImage(named: "Menu-\(action.rawValue)")
+            image?.isTemplate = true
+            image?.accessibilityDescription = action.displayName
+            return image
+        }
+    }
+
+    /// macOS 27 hides menu item images unless the item asks for them
+    /// (NSMenuItem.preferredImageVisibility); earlier versions always show them.
+    static func setIcon(_ image: NSImage?, on item: NSMenuItem) {
+        item.image = image
+        if #available(macOS 27.0, *), image != nil {
+            item.preferredImageVisibility = .visible
+        }
+    }
+
+    static func symbol(_ name: String) -> NSImage? {
+        NSImage(systemSymbolName: name, accessibilityDescription: nil)
     }
 
     private func info(_ title: String) -> NSMenuItem {
@@ -135,6 +215,16 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     private func action(of sender: NSMenuItem) -> WindowAction? {
         (sender.representedObject as? String).flatMap(WindowAction.init(rawValue:))
+    }
+
+    static func format(_ date: Date) -> String {
+        Calendar.current.isDateInToday(date)
+            ? date.formatted(date: .omitted, time: .shortened)
+            : date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private static func truncated(_ text: String, to length: Int) -> String {
+        text.count <= length ? text : String(text.prefix(length - 1)) + "…"
     }
 
     // MARK: - Handlers
@@ -150,6 +240,28 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     @objc private func runAction(_ sender: NSMenuItem) {
         guard let action = action(of: sender) else { return }
         runner.perform(action)
+    }
+
+    @objc private func disableForAnHour() {
+        pause.pause(hours: 1)
+    }
+
+    @objc private func disableForHours() {
+        guard let hours = HoursPrompt.ask() else { return }
+        pause.pause(hours: hours)
+    }
+
+    @objc private func resume() {
+        pause.resume()
+    }
+
+    @objc private func toggleApp() {
+        guard let app = menuTargetApp else { return }
+        if pause.settings.isDisabled(bundleID: app.bundleID) {
+            pause.enable(bundleID: app.bundleID)
+        } else {
+            pause.disable(app)
+        }
     }
 
     @objc private func openSettings() {
@@ -170,4 +282,28 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         fixture.show()
     }
     #endif
+}
+
+/// Small dialog asking for how many hours to disable the shortcuts.
+@MainActor
+enum HoursPrompt {
+    static func ask() -> Int? {
+        let alert = NSAlert()
+        // A menu-bar-only app's alerts don't pick up its icon by themselves.
+        alert.icon = NSApp.applicationIconImage
+        alert.messageText = "Disable Zuntrio's shortcuts for how long?"
+        alert.informativeText = "Until then, the shortcuts go to the app you're using."
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 140, height: 26), pullsDown: false)
+        for hours in PauseSettings.hourRange {
+            popup.addItem(withTitle: hours == 1 ? "1 hour" : "\(hours) hours")
+            popup.lastItem?.tag = hours
+        }
+        popup.selectItem(withTag: 2)
+        alert.accessoryView = popup
+        alert.addButton(withTitle: "Disable")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate()
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return popup.selectedItem?.tag
+    }
 }
