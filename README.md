@@ -50,7 +50,23 @@ The defaults match Spectacle's, so former Spectacle users can keep their muscle 
 - Next/Previous Third steps through three columns, then three rows.
 - Moving to another display keeps the window's relative position and size.
 - Undo/Redo is not implemented yet.
-- Changing shortcuts, and an alternative ⌃⌥-based preset (⌥⌘←/→ also switch tabs in most browsers), come with the settings window.
+- The **Shortcuts** submenu lets you turn individual shortcuts on or off, restore the defaults,
+  or switch to the **Alternative (⌃⌥)** preset. That preset leaves ⌥⌘←/→ free, which most
+  browsers use to switch tabs.
+- Choosing your own key combinations comes with the settings window.
+- Zuntrio warns when a shortcut is already taken by another app or may clash with a macOS
+  keyboard shortcut.
+
+Alternative preset:
+
+| Action | Shortcut |
+|---|---|
+| Center / Maximize | ⌃⌥C / ⌃⌥↩ |
+| Left / Right / Top / Bottom half | ⌃⌥← / ⌃⌥→ / ⌃⌥↑ / ⌃⌥↓ |
+| Upper left / Upper right / Lower left / Lower right | ⌃⌥U / ⌃⌥I / ⌃⌥J / ⌃⌥K |
+| Next / Previous third | ⌃⌥⇧→ / ⌃⌥⇧← |
+| Larger / Smaller | ⌃⌥= / ⌃⌥- |
+| Next / Previous display | ⌃⌥⌘→ / ⌃⌥⌘← |
 
 ## Building from source
 

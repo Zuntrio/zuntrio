@@ -22,6 +22,41 @@ import ZuntrioCore
 enum ProofOfConceptRun {
     private static var fixture: FixtureWindowController?
 
+    /// `--poc-shortcut-report <path>` writes registration results and macOS
+    /// shortcut conflicts for every preset, then quits.
+    static func writeShortcutReportIfRequested(arguments: [String], shortcuts: ShortcutController) {
+        guard let output = value(after: "--poc-shortcut-report", in: arguments) else { return }
+        // Optional settings changes through the real controller (and so the
+        // real persistence path): "preset:alternative", "disable:center",
+        // "enable:center", "restore".
+        for op in (value(after: "--poc-shortcut-ops", in: arguments) ?? "").split(separator: ",") {
+            let parts = op.split(separator: ":").map(String.init)
+            switch (parts.first, parts.count > 1 ? parts[1] : nil) {
+            case ("preset", let name?): ShortcutPreset(rawValue: name).map(shortcuts.select)
+            case ("disable", let name?): LayoutAction(rawValue: name).map { shortcuts.setEnabled(false, for: $0) }
+            case ("enable", let name?): LayoutAction(rawValue: name).map { shortcuts.setEnabled(true, for: $0) }
+            case ("restore", _): shortcuts.restoreDefaults()
+            default: break
+            }
+        }
+        let system = SystemShortcuts.enabledCombos()
+        var presets: [String: Any] = [:]
+        for preset in ShortcutPreset.allCases {
+            let conflicts = ShortcutSettings(preset: preset).systemConflicts(reserved: system)
+            presets[preset.rawValue] = conflicts.map { "\($0.rawValue) \(preset.bindings[$0]?.displayString ?? "")" }
+        }
+        write([
+            "activePreset": shortcuts.settings.preset.rawValue,
+            "disabled": LayoutAction.allCases.filter { !shortcuts.settings.isEnabled($0) }.map(\.rawValue),
+            "registered": shortcuts.settings.effectiveBindings.count - shortcuts.failures.count,
+            "failures": shortcuts.failures.map { "\($0.key.rawValue): \($0.value)" },
+            "systemConflictsActive": shortcuts.systemConflicts.map(\.rawValue).sorted(),
+            "systemConflictsByPreset": presets,
+            "enabledMacOSShortcuts": system.count,
+        ], to: output)
+        NSApp.terminate(nil)
+    }
+
     static func startIfRequested(arguments: [String], runner defaultRunner: WindowActionRunner) {
         if arguments.contains("--poc-fixture-host") {
             let controller = FixtureWindowController()

@@ -59,6 +59,12 @@ final class HotKeyCenter {
         handlers[id] = nil
     }
 
+    func unregisterAll() {
+        for id in Array(references.keys) {
+            unregister(id)
+        }
+    }
+
     fileprivate func handle(id: UInt32) {
         handlers[id]?()
     }
