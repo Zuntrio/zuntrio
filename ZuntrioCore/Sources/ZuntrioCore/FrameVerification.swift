@@ -8,14 +8,21 @@ public enum FrameOutcome: Sendable, Equatable {
     case exact
     /// The window moved or resized, but not to the requested frame.
     case clamped(requested: CGRect, actual: CGRect)
-    /// The window did not change at all although a different frame was requested.
+    /// The window did not change at all although a clearly different frame was requested.
     case ignored(requested: CGRect, actual: CGRect)
+    /// The window did not change, but the request was within one "grid step"
+    /// of where it already is: the app (e.g. a terminal snapping to its
+    /// character grid) is already as close as it allows.
+    case alreadyClosest(requested: CGRect, actual: CGRect)
 }
 
 public enum FrameVerification {
     /// Default tolerance in points. AX positions are integral in practice;
     /// one point absorbs rounding differences between apps.
     public static let defaultTolerance: CGFloat = 1
+    /// Largest per-edge difference still treated as "as close as the app allows".
+    /// Covers terminal cell sizes (about 7×17 pt at common font sizes).
+    public static let closestTolerance: CGFloat = 20
 
     public static func outcome(
         before: CGRect,
@@ -27,7 +34,9 @@ public enum FrameVerification {
             return .exact
         }
         if matches(before, actual, tolerance: tolerance) {
-            return .ignored(requested: requested, actual: actual)
+            return matches(requested, actual, tolerance: closestTolerance)
+                ? .alreadyClosest(requested: requested, actual: actual)
+                : .ignored(requested: requested, actual: actual)
         }
         return .clamped(requested: requested, actual: actual)
     }

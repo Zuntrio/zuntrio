@@ -29,4 +29,18 @@ import Testing
     @Test func requestingCurrentFrameIsExactNotIgnored() {
         #expect(FrameVerification.outcome(before: requested, requested: requested, actual: requested) == .exact)
     }
+
+    @Test func gridSnappedWindowThatCannotGetCloserIsAlreadyClosest() {
+        // Terminal near full screen: Make Larger asks for 4×10 pt more; the grid can't grow.
+        let terminal = CGRect(x: 0, y: 31, width: 1676, height: 947)
+        let larger = CGRect(x: 0, y: 31, width: 1680, height: 957)
+        #expect(FrameVerification.outcome(before: terminal, requested: larger, actual: terminal)
+                == .alreadyClosest(requested: larger, actual: terminal))
+    }
+
+    @Test func unchangedWindowFarFromRequestIsStillIgnored() {
+        let far = CGRect(x: 0, y: 25, width: 1100, height: 805) // 300 pt wider than before
+        #expect(FrameVerification.outcome(before: before, requested: far, actual: before)
+                == .ignored(requested: far, actual: before))
+    }
 }

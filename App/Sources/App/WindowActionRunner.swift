@@ -10,7 +10,7 @@ struct ActionReport: Sendable, Equatable {
         case clamped
         /// A change was requested but the window didn't move or resize.
         case ignored
-        /// The window is already where this action puts it (or as close as the app allows).
+        /// The window is already where this action puts it, or as close as the app allows.
         case alreadyInPlace
         /// The action has nothing to do (single display, minimum size reached).
         case nothingToDo
@@ -240,6 +240,7 @@ final class WindowActionRunner {
         case .exact: .exact
         case .clamped: .clamped
         case .ignored: .ignored
+        case .alreadyClosest: .alreadyInPlace
         }
     }
 
