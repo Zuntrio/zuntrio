@@ -256,6 +256,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 enum HoursPrompt {
     static func ask() -> Int? {
         let alert = NSAlert()
+        // A menu-bar-only app's alerts don't pick up its icon by themselves.
+        alert.icon = NSApp.applicationIconImage
         alert.messageText = "Disable Zuntrio's shortcuts for how long?"
         alert.informativeText = "Until then, the shortcuts go to the app you're using."
         let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 140, height: 26), pullsDown: false)
