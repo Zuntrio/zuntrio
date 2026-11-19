@@ -4,9 +4,9 @@ Zuntrio is a free, open-source window manager for macOS. You move and resize win
 keyboard shortcuts. It is inspired by [Spectacle](https://github.com/eczarny/spectacle), which
 is no longer maintained, and keeps the same keyboard-first workflow.
 
-> **Status: early development.** The current build is a technical proof of concept with three
-> actions (Left Half, Maximize, Center). It is not ready for everyday use yet, and no release
-> has been published.
+> **Status: early development.** All Spectacle window actions work with their default
+> shortcuts. Undo/redo, shortcut settings and multi-display testing are still in progress.
+> No release has been published.
 
 ## Requirements
 
@@ -29,7 +29,7 @@ Zuntrio uses this access only to read and set the position and size of the focus
 - It never reads or stores window titles, document names, keystrokes or app activity.
 - Settings stay on your Mac.
 
-## Planned shortcuts
+## Shortcuts
 
 The defaults match Spectacle's, so former Spectacle users can keep their muscle memory.
 
@@ -46,9 +46,11 @@ The defaults match Spectacle's, so former Spectacle users can keep their muscle 
 | Next / Previous display | ⌃⌥⌘→ / ⌃⌥⌘← |
 | Undo / Redo | ⌥⌘Z / ⌥⇧⌘Z |
 
-- Pressing a half shortcut repeatedly cycles the width ½ → ⅔ → ⅓.
-- Only **⌥⌘← Left Half** works in the current proof of concept.
-- An alternative ⌃⌥-based preset is planned, because ⌥⌘←/→ also switch tabs in most browsers.
+- Pressing a half or corner shortcut repeatedly cycles the size ½ → ⅔ → ⅓.
+- Next/Previous Third steps through three columns, then three rows.
+- Moving to another display keeps the window's relative position and size.
+- Undo/Redo is not implemented yet.
+- Changing shortcuts, and an alternative ⌃⌥-based preset (⌥⌘←/→ also switch tabs in most browsers), come with the settings window.
 
 ## Building from source
 

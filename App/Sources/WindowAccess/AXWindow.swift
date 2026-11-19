@@ -39,6 +39,10 @@ final class AXWindow: ManagedWindow {
         self.application = application
     }
 
+    /// AXUIElement equality/hash are CFEqual/CFHash, which identify the same
+    /// window across separate lookups.
+    var identity: AnyHashable { AnyHashable(element) }
+
     func frame() throws(WindowAccessError) -> CGRect {
         let position = try AX.copyPoint(element, kAXPositionAttribute)
         let size = try AX.copySize(element, kAXSizeAttribute)

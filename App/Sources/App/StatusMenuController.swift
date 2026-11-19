@@ -7,14 +7,26 @@ import ZuntrioCore
 final class StatusMenuController: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let runner: WindowActionRunner
-    private let shortcutStatus: String
+    private let shortcuts: [LayoutAction: KeyCombo]
+    private let unavailable: [LayoutAction: String]
     #if DEBUG
     private lazy var fixture = FixtureWindowController()
     #endif
 
-    init(runner: WindowActionRunner, shortcutStatus: String) {
+    /// Menu sections, in Spectacle's order.
+    private static let sections: [[LayoutAction]] = [
+        [.center, .maximize],
+        [.leftHalf, .rightHalf, .topHalf, .bottomHalf],
+        [.upperLeft, .upperRight, .lowerLeft, .lowerRight],
+        [.nextThird, .previousThird],
+        [.larger, .smaller],
+        [.nextDisplay, .previousDisplay],
+    ]
+
+    init(runner: WindowActionRunner, shortcuts: [LayoutAction: KeyCombo], unavailable: [LayoutAction: String]) {
         self.runner = runner
-        self.shortcutStatus = shortcutStatus
+        self.shortcuts = shortcuts
+        self.unavailable = unavailable
         super.init()
 
         if let button = statusItem.button {
@@ -38,15 +50,18 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             menu.addItem(info("Or open \(AccessibilityPermission.manualPath)"))
         }
 
-        menu.addItem(.separator())
-        for action in LayoutAction.allCases {
-            let menuItem = item(action.displayName, #selector(runAction(_:)))
-            menuItem.representedObject = action.rawValue
-            menu.addItem(menuItem)
+        for section in Self.sections {
+            menu.addItem(.separator())
+            for action in section {
+                menu.addItem(actionItem(action))
+            }
         }
 
         menu.addItem(.separator())
-        menu.addItem(info(shortcutStatus))
+        if !unavailable.isEmpty {
+            let names = unavailable.keys.map(\.displayName).sorted().joined(separator: ", ")
+            menu.addItem(info("Shortcuts unavailable: \(names)"))
+        }
         menu.addItem(info("Last: " + (runner.lastReport?.summary ?? "none")))
 
         #if DEBUG
@@ -57,6 +72,22 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit Zuntrio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
+    }
+
+    /// An action item showing its global shortcut in a tab-aligned column.
+    /// The shortcut is shown as text, not as a key equivalent: key equivalents
+    /// would only fire while the menu is open and duplicate the global hotkey.
+    private func actionItem(_ action: LayoutAction) -> NSMenuItem {
+        var title = action.displayName
+        if let combo = shortcuts[action] {
+            title += unavailable[action] == nil ? "\t\(combo.displayString)" : "\t\(combo.displayString) (unavailable)"
+        }
+        let menuItem = item(title, #selector(runAction(_:)))
+        menuItem.representedObject = action.rawValue
+        let style = NSMutableParagraphStyle()
+        style.tabStops = [NSTextTab(textAlignment: .right, location: 240)]
+        menuItem.attributedTitle = NSAttributedString(string: title, attributes: [.paragraphStyle: style, .font: NSFont.menuFont(ofSize: 0)])
+        return menuItem
     }
 
     private func item(_ title: String, _ selector: Selector) -> NSMenuItem {

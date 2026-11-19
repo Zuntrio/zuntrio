@@ -33,6 +33,18 @@ enum ProofOfConceptRun {
               let output = value(after: "--poc-output", in: arguments) else { return }
         let actions = actionsArgument.split(separator: ",").compactMap { LayoutAction(rawValue: String($0)) }
         let targetPID = value(after: "--poc-target-pid", in: arguments).flatMap { pid_t($0) }
+        // Never fall back to the frontmost window when a specific target was
+        // asked for but can't be parsed: that would move the user's windows.
+        if arguments.contains("--poc-target-pid") && (targetPID == nil || targetPID ?? 0 <= 0) {
+            write(["error": "invalid --poc-target-pid"], to: output)
+            NSApp.terminate(nil)
+            return
+        }
+        if actions.isEmpty {
+            write(["error": "no valid actions in --poc-run"], to: output)
+            NSApp.terminate(nil)
+            return
+        }
         let provider: any WindowProviding = targetPID.map { ProcessWindowProvider(pid: $0) } ?? AXWindowProvider()
         let runner = targetPID == nil ? defaultRunner : WindowActionRunner(provider: provider)
         let restore = arguments.contains("--poc-restore")
@@ -101,6 +113,8 @@ enum ProofOfConceptRun {
         case .exact: entry["result"] = "exact"
         case .clamped: entry["result"] = "clamped"
         case .ignored: entry["result"] = "ignored"
+        case .alreadyInPlace: entry["result"] = "alreadyInPlace"
+        case .nothingToDo: entry["result"] = "nothingToDo"
         case .failed(let reason):
             entry["result"] = "failed"
             entry["reason"] = reason

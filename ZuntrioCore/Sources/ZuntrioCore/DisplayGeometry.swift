@@ -50,3 +50,17 @@ public enum DisplaySelection {
         return dx * dx + dy * dy
     }
 }
+
+/// Deterministic order for next/previous display: left to right by the
+/// display's left edge, then top to bottom, then by identifier. This avoids
+/// depending on the order `NSScreen.screens` happens to return.
+public enum DisplayOrdering {
+    public static func order(_ displays: [DisplayGeometry]) -> [Int] {
+        displays.indices.sorted { a, b in
+            let da = displays[a].frame, db = displays[b].frame
+            if da.minX != db.minX { return da.minX < db.minX }
+            if da.minY != db.minY { return da.minY < db.minY }
+            return displays[a].id < displays[b].id
+        }
+    }
+}

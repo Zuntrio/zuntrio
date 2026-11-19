@@ -27,6 +27,9 @@ enum WindowAccessError: Error, Equatable, CustomStringConvertible {
 /// A window whose frame can be read and set, in Accessibility coordinates.
 @MainActor
 protocol ManagedWindow {
+    /// Stable identity for the lifetime of the window (used to remember the
+    /// last action applied to it). Not persisted and never logged.
+    var identity: AnyHashable { get }
     func frame() throws(WindowAccessError) -> CGRect
     /// Applies `target` and returns the frame read back afterwards. The read-back
     /// value is the truth; it may differ from `target` if the app clamps it.

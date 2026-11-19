@@ -37,3 +37,21 @@ import Testing
         #expect(DisplaySelection.displayIndex(for: CGRect(x: 6000, y: 0, width: 100, height: 100), in: displays) == 1)
     }
 }
+
+@Suite struct DisplayOrderingTests {
+    func display(_ id: UInt32, x: CGFloat, y: CGFloat) -> DisplayGeometry {
+        let frame = CGRect(x: x, y: y, width: 100, height: 100)
+        return DisplayGeometry(id: id, frame: frame, visibleFrame: frame)
+    }
+
+    @Test func leftToRightThenTopToBottomThenID() {
+        let displays = [
+            display(5, x: 100, y: 0),
+            display(4, x: -100, y: 0),
+            display(3, x: 100, y: -100),
+            display(2, x: 0, y: 0),
+            display(1, x: 0, y: 0),
+        ]
+        #expect(DisplayOrdering.order(displays) == [1, 4, 3, 2, 0])
+    }
+}
