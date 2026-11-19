@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 27
+        run: |
+          ls -d /Applications/Xcode*.app
+          XCODE=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE" ]; then echo "::error::Xcode 27 is not available on this runner image"; exit 1; fi
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          sw_vers
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: Unit tests (ZuntrioCore)
+        run: swift test --package-path ZuntrioCore
+
+      - name: Tests through the Xcode scheme
+        run: xcodebuild -project Zuntrio.xcodeproj -scheme Zuntrio -destination 'platform=macOS' -derivedDataPath build test
+
+      - name: Universal Release build
+        run: |
+          xcodebuild -project Zuntrio.xcodeproj -scheme Zuntrio -configuration Release \
+            -destination 'generic/platform=macOS' -derivedDataPath build build
+
+      - name: Check the Release app
+        run: |
+          APP=build/Build/Products/Release/Zuntrio.app
+          BIN="$APP/Contents/MacOS/Zuntrio"
+          ARCHS=$(lipo -archs "$BIN"); echo "architectures: $ARCHS"
+          case "$ARCHS" in *x86_64*arm64*|*arm64*x86_64*) ;; *) echo "::error::not a Universal binary"; exit 1;; esac
+          if codesign -d --entitlements - "$APP" 2>&1 | grep -q get-task-allow; then echo "::error::Release build has get-task-allow"; exit 1; fi
+          if strings -a "$BIN" | grep -q -- '--poc-'; then echo "::error::debug test harness found in Release build"; exit 1; fi
+          echo "Release app checks passed"
