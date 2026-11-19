@@ -14,6 +14,8 @@ import ZuntrioCore
 ///     open -n -g Zuntrio.app --args --poc-fixture-host          # shows the test window, stays running
 ///     open -n -g Zuntrio.app --args --poc-run … --poc-output … --poc-target-pid <host pid>
 ///
+/// Add `--poc-restore` to put the window back at its original frame afterwards.
+///
 /// Writes geometry-only results as JSON, then quits. Launch with `open` so
 /// macOS attributes the Accessibility permission to Zuntrio, not the terminal.
 @MainActor
@@ -31,7 +33,9 @@ enum ProofOfConceptRun {
               let output = value(after: "--poc-output", in: arguments) else { return }
         let actions = actionsArgument.split(separator: ",").compactMap { LayoutAction(rawValue: String($0)) }
         let targetPID = value(after: "--poc-target-pid", in: arguments).flatMap { pid_t($0) }
-        let runner = targetPID.map { WindowActionRunner(provider: ProcessWindowProvider(pid: $0)) } ?? defaultRunner
+        let provider: any WindowProviding = targetPID.map { ProcessWindowProvider(pid: $0) } ?? AXWindowProvider()
+        let runner = targetPID == nil ? defaultRunner : WindowActionRunner(provider: provider)
+        let restore = arguments.contains("--poc-restore")
 
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1))
@@ -43,11 +47,25 @@ enum ProofOfConceptRun {
                 try? await Task.sleep(for: .milliseconds(400))
             }
 
+            // Put the window back where it started, so tests against real
+            // apps leave the user's layout untouched.
+            var restored: [String: Any] = [:]
+            if restore, let original = entries.first.flatMap({ $0["before"] as? [Double] }), original.count == 4 {
+                let frame = CGRect(x: original[0], y: original[1], width: original[2], height: original[3])
+                do throws(WindowAccessError) {
+                    let actual = try provider.focusedWindow().setFrame(frame)
+                    restored = ["requested": rect(frame), "actual": rect(actual)]
+                } catch {
+                    restored = ["error": error.description]
+                }
+            }
+
             let document: [String: Any] = [
                 "trusted": AccessibilityPermission.isTrusted,
                 "targetPID": targetPID.map { Int($0) } ?? -1,
                 "displays": DisplayProvider.current().map { ["frame": rect($0.frame), "visibleFrame": rect($0.visibleFrame)] },
                 "results": entries,
+                "restore": restored,
             ]
             write(document, to: output)
             NSApp.terminate(nil)
