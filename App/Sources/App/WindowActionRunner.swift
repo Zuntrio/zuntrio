@@ -14,7 +14,7 @@ struct ActionReport: Sendable, Equatable {
         case alreadyInPlace
         /// The action has nothing to do (single display, minimum size reached).
         case nothingToDo
-        case failed(String)
+        case failed(WindowAccessError)
     }
 
     let action: LayoutAction
@@ -35,10 +35,12 @@ struct ActionReport: Sendable, Equatable {
             "\(action.displayName): already in place"
         case .nothingToDo:
             "\(action.displayName): nothing to do"
-        case .failed(let reason):
-            "\(action.displayName): \(reason)"
+        case .failed(let error):
+            "\(action.displayName): \(error.description)"
         }
     }
+
+    var isPermissionMissing: Bool { result == .failed(.notTrusted) }
 
     private static func size(_ rect: CGRect?) -> String {
         guard let rect else { return "?" }
@@ -119,7 +121,7 @@ final class WindowActionRunner {
             }
             return ActionReport(action: action, result: result, before: before, requested: target, actual: actual)
         } catch {
-            return ActionReport(action: action, result: .failed(error.description))
+            return ActionReport(action: action, result: .failed(error))
         }
     }
 

@@ -2,7 +2,7 @@ import CoreGraphics
 
 /// Failures when finding or manipulating a window. Messages never contain
 /// window titles or app names.
-enum WindowAccessError: Error, Equatable, CustomStringConvertible {
+enum WindowAccessError: Error, Equatable, Sendable, CustomStringConvertible {
     case notTrusted
     case noFrontmostApplication
     case noFocusedWindow

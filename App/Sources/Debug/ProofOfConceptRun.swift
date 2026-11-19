@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import SwiftUI
 import ZuntrioCore
 
 /// Debug-only scripted run used to collect evidence for the proof of concept.
@@ -54,6 +55,31 @@ enum ProofOfConceptRun {
             "systemConflictsByPreset": presets,
             "enabledMacOSShortcuts": system.count,
         ], to: output)
+        NSApp.terminate(nil)
+    }
+
+    /// `--poc-render-onboarding <directory>` renders the welcome view in both
+    /// permission states to PNG (for layout review), then quits.
+    static func renderOnboardingIfRequested(arguments: [String], shortcuts: ShortcutController) {
+        guard let directory = value(after: "--poc-render-onboarding", in: arguments) else { return }
+        let examples: [LayoutAction] = [.leftHalf, .rightHalf, .maximize, .center, .nextDisplay]
+        for trusted in [false, true] {
+            let model = OnboardingModel(
+                isTrusted: trusted,
+                examples: examples.map { ($0.displayName, shortcuts.combo(for: $0)?.displayString ?? "—") }
+            )
+            let view = OnboardingView(model: model).background(Color(nsColor: .windowBackgroundColor))
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 2
+            guard let image = renderer.cgImage else { continue }
+            let rep = NSBitmapImageRep(cgImage: image)
+            let name = trusted ? "onboarding-granted.png" : "onboarding-needed.png"
+            do {
+                try rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent(name))
+            } catch {
+                Log.actions.error("Rendering onboarding failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
         NSApp.terminate(nil)
     }
 
@@ -150,9 +176,9 @@ enum ProofOfConceptRun {
         case .ignored: entry["result"] = "ignored"
         case .alreadyInPlace: entry["result"] = "alreadyInPlace"
         case .nothingToDo: entry["result"] = "nothingToDo"
-        case .failed(let reason):
+        case .failed(let error):
             entry["result"] = "failed"
-            entry["reason"] = reason
+            entry["reason"] = error.description
         }
         if let before = report.before { entry["before"] = rect(before) }
         if let requested = report.requested { entry["requested"] = rect(requested) }

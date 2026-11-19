@@ -8,6 +8,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let runner: WindowActionRunner
     private let shortcuts: ShortcutController
+    private let monitor: AccessibilityMonitor
+    private let showWelcome: () -> Void
     #if DEBUG
     private lazy var fixture = FixtureWindowController()
     #endif
@@ -22,9 +24,12 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         [.nextDisplay, .previousDisplay],
     ]
 
-    init(runner: WindowActionRunner, shortcuts: ShortcutController) {
+    init(runner: WindowActionRunner, shortcuts: ShortcutController, monitor: AccessibilityMonitor,
+         showWelcome: @escaping () -> Void) {
         self.runner = runner
         self.shortcuts = shortcuts
+        self.monitor = monitor
+        self.showWelcome = showWelcome
         super.init()
 
         if let button = statusItem.button {
@@ -36,11 +41,19 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false
         statusItem.menu = menu
+        trustChanged(monitor.isTrusted)
+    }
+
+    /// Dims the menu-bar icon while Accessibility access is missing.
+    func trustChanged(_ trusted: Bool) {
+        statusItem.button?.appearsDisabled = !trusted
+        statusItem.button?.toolTip = trusted ? "Zuntrio" : "Zuntrio needs Accessibility access"
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        let trusted = AccessibilityPermission.isTrusted
+        monitor.refresh()
+        let trusted = monitor.isTrusted
 
         menu.addItem(info(trusted ? "Accessibility: granted" : "Accessibility: not granted"))
         if !trusted {
@@ -68,8 +81,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
         menu.addItem(info("Last: " + (runner.lastReport?.summary ?? "none")))
 
-        #if DEBUG
         menu.addItem(.separator())
+        menu.addItem(item("Welcome & Permissions…", #selector(openWelcome)))
+        menu.addItem(item("About Zuntrio", #selector(showAbout)))
+        #if DEBUG
         menu.addItem(item("Show Test Window", #selector(showFixture)))
         #endif
 
@@ -174,6 +189,15 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     @objc private func toggleShortcut(_ sender: NSMenuItem) {
         guard let action = action(of: sender) else { return }
         shortcuts.setEnabled(!shortcuts.settings.isEnabled(action), for: action)
+    }
+
+    @objc private func openWelcome() {
+        showWelcome()
+    }
+
+    @objc private func showAbout() {
+        NSApp.activate()
+        NSApp.orderFrontStandardAboutPanel(nil)
     }
 
     @objc private func restoreDefaults() {
