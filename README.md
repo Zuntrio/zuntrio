@@ -62,6 +62,16 @@ Or install it with [Homebrew](https://brew.sh):
 brew install --cask zuntrio/tap/zuntrio
 ```
 
+Or with curl (or `wget -qO-` in place of `curl -fsSL`):
+
+```sh
+curl -fsSL https://zuntrio.app/install.sh | bash
+```
+
+The [script](https://zuntrio.app/install.sh) downloads the release from GitHub, checks its SHA-256
+checksum, checks that the app is signed by Zuntrio's Developer ID and notarized by Apple, and moves it
+to Applications. Run it again to update.
+
 Then open Zuntrio and grant Accessibility access, as in steps 3 and 4.
 
 To build it yourself, see [Building from source](#building-from-source).
