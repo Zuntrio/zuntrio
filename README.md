@@ -29,8 +29,8 @@ Zuntrio exists so that workflow doesn't disappear. It aims to be:
 ## Requirements
 
 - macOS 14 Sonoma or later
-- Apple Silicon or Intel (Universal app). See [Compatibility](#compatibility) for what has
-  actually been tested.
+- Apple Silicon or Intel: one app that runs natively on both. See
+  [Compatibility](#compatibility) for what has been tested.
 
 ## Install
 
@@ -130,7 +130,8 @@ Tested so far (beta preparation):
 | Displays | Built-in Retina + external 2560×1440, arranged above and side by side; plugging and unplugging |
 | Apps | TextEdit, Safari, Google Chrome, Visual Studio Code, Terminal (TextEdit on every macOS version above) |
 
-**Not tested yet:** Intel Macs. The app is built for them, so please report what you find.
+**Using an Intel Mac?** Zuntrio runs natively on both Apple Silicon and Intel. If something doesn't
+work on your Intel Mac, please [let us know](https://github.com/Zuntrio/zuntrio/issues/new/choose).
 
 ## Privacy
 
