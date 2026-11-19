@@ -130,13 +130,23 @@ please report what you find.
 
 ## Uninstall
 
-1. Quit Zuntrio (menu-bar icon → **Quit Zuntrio**).
-2. If you turned on **Launch at login**, turn it off in Settings first, or remove Zuntrio
-   in System Settings → General → Login Items.
-3. Delete **Zuntrio** from Applications.
-4. Optionally remove its settings and its Accessibility entry:
-   - Run `defaults delete app.zuntrio.Zuntrio` in Terminal.
-   - Remove Zuntrio from System Settings → Privacy & Security → Accessibility with **–**.
+1. If you turned on **Launch at login**, turn it off first: Zuntrio menu → **Settings…**. If
+   you've already removed the app, delete the entry in System Settings → General → Login Items
+   instead.
+2. Quit Zuntrio (menu-bar icon → **Quit Zuntrio**).
+3. Delete **Zuntrio** from your Applications folder.
+4. Optionally, remove everything Zuntrio left on your Mac. Run these in Terminal:
+
+   ```sh
+   # Your shortcut settings (~/Library/Preferences/app.zuntrio.Zuntrio.plist)
+   defaults delete app.zuntrio.Zuntrio
+
+   # Zuntrio's entry in System Settings → Privacy & Security → Accessibility
+   tccutil reset Accessibility app.zuntrio.Zuntrio
+   ```
+
+   Instead of the second command, you can select Zuntrio in that Accessibility list and click
+   **–**. Zuntrio stores nothing else. Undo history only exists while it's running.
 
 ## Building from source
 
