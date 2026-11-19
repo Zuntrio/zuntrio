@@ -4,7 +4,8 @@ name: Release
 # GitHub release. Publishing the draft is a manual step.
 #
 # Disabled until the repository variable RELEASE_ENABLED is set to "true",
-# which should only happen once the signing secrets below exist:
+# which should only happen once these secrets exist in the "release"
+# environment (each run waits for the owner's approval):
 #   DEVELOPER_ID_P12_BASE64   Developer ID Application certificate + key (.p12, base64)
 #   DEVELOPER_ID_P12_PASSWORD password of that .p12
 #   DEVELOPER_TEAM_ID         Apple team ID
@@ -27,6 +28,9 @@ permissions:
 jobs:
   release:
     if: vars.RELEASE_ENABLED == 'true'
+    # Secrets live in the "release" environment, which requires the owner's
+    # approval before each run.
+    environment: release
     runs-on: macos-latest
     timeout-minutes: 60
     env:
