@@ -8,4 +8,5 @@ enum Log {
     static let permissions = Logger(subsystem: subsystem, category: "permissions")
     static let shortcuts = Logger(subsystem: subsystem, category: "shortcuts")
     static let accessibility = Logger(subsystem: subsystem, category: "accessibility")
+    static let settings = Logger(subsystem: subsystem, category: "settings")
 }

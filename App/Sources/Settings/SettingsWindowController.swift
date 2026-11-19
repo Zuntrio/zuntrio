@@ -16,14 +16,16 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         self.window = window
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
+        Log.settings.info("Settings shown; app active=\(NSApp.isActive), window key=\(window.isKeyWindow)")
     }
 
-    /// Recording must never outlive the window, or global shortcuts would stay suspended.
+    /// Recording must never outlive the window, or shortcuts would stay in capture mode.
     func windowWillClose(_ notification: Notification) {
         model.stopRecording()
     }
 
     func windowDidResignKey(_ notification: Notification) {
+        Log.settings.info("Settings window resigned key")
         model.stopRecording()
     }
 

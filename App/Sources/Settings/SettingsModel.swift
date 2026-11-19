@@ -113,7 +113,14 @@ final class SettingsModel {
         stopRecording()
         recording = action
         rowMessage = nil
-        shortcuts.suspend()
+        // Zuntrio's own shortcuts reach us as hotkey events; everything else
+        // arrives as a normal key press below.
+        shortcuts.beginCapture { [weak self] combo in
+            Log.settings.info("Recording received a key press (registered shortcut)")
+            self?.record(combo)
+        }
+        // Recording events are logged without the keys pressed.
+        Log.settings.info("Recording started for \(action.rawValue, privacy: .public); app active=\(NSApp.isActive), key window=\(NSApp.keyWindow != nil)")
         // Only sees key presses while Zuntrio's settings window is key; the
         // event is consumed so it can't trigger anything else in the app.
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -130,14 +137,16 @@ final class SettingsModel {
         }
         keyMonitor = nil
         if recording != nil {
+            Log.settings.info("Recording stopped")
             recording = nil
-            shortcuts.resume()
+            shortcuts.endCapture()
             reload()
         }
     }
 
     private func handle(_ event: NSEvent) {
         guard let action = recording else { return }
+        Log.settings.info("Recording received a key press (key event)")
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let plain = flags.intersection([.command, .option, .control, .shift]).isEmpty
 
@@ -157,10 +166,14 @@ final class SettingsModel {
         if flags.contains(.option) { modifiers.insert(.option) }
         if flags.contains(.control) { modifiers.insert(.control) }
         if flags.contains(.shift) { modifiers.insert(.shift) }
-        let combo = KeyCombo(keyCode: event.keyCode, modifiers: modifiers)
+        record(KeyCombo(keyCode: event.keyCode, modifiers: modifiers))
+    }
 
+    private func record(_ combo: KeyCombo) {
+        guard let action = recording else { return }
         stopRecording()
         if let issue = shortcuts.assign(combo, to: action) {
+            Log.settings.info("Recorded shortcut refused: \(String(describing: issue), privacy: .public)")
             rowMessage = (action, Self.describe(issue, combo))
         } else if shortcuts.failures[action] != nil {
             rowMessage = (action, "\(combo.displayString) is in use by another app.")

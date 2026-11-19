@@ -24,6 +24,12 @@ final class HotKeyCenter {
 
     private var handlers: [UInt32: () -> Void] = [:]
     private var references: [UInt32: EventHotKeyRef] = [:]
+    private var combos: [UInt32: (keyCode: UInt32, modifiers: UInt32)] = [:]
+    /// While set, presses of registered hotkeys are passed here (key code,
+    /// Carbon modifiers) instead of running their handlers. Used by the
+    /// shortcut recorder: a registered combination is delivered to the hotkey
+    /// owner before AppKit sees it, so it can only be captured this way.
+    var interceptor: ((UInt32, UInt32) -> Void)?
     private var eventHandler: EventHandlerRef?
     private var nextID: UInt32 = 1
 
@@ -46,6 +52,7 @@ final class HotKeyCenter {
         nextID += 1
         handlers[id] = handler
         references[id] = reference
+        combos[id] = (keyCode, modifiers)
         return id
     }
 
@@ -57,6 +64,7 @@ final class HotKeyCenter {
             }
         }
         handlers[id] = nil
+        combos[id] = nil
     }
 
     func unregisterAll() {
@@ -66,7 +74,11 @@ final class HotKeyCenter {
     }
 
     fileprivate func handle(id: UInt32) {
-        handlers[id]?()
+        if let interceptor, let combo = combos[id] {
+            interceptor(combo.keyCode, combo.modifiers)
+        } else {
+            handlers[id]?()
+        }
     }
 
     private func installEventHandlerIfNeeded() throws(HotKeyError) {

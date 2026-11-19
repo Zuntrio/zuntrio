@@ -62,14 +62,16 @@ final class ShortcutController {
         return issue
     }
 
-    /// Releases all global hotkeys while the user records a new shortcut, so
-    /// pressing an existing Zuntrio shortcut records it instead of running it.
-    func suspend() {
-        hotKeys.unregisterAll()
+    /// Routes presses of Zuntrio's own shortcuts to `handler` instead of
+    /// running their actions, while the user records a new shortcut.
+    func beginCapture(_ handler: @escaping (KeyCombo) -> Void) {
+        hotKeys.interceptor = { keyCode, carbonModifiers in
+            handler(KeyCombo(keyCode: UInt16(keyCode), modifiers: SystemShortcuts.modifiers(fromCarbon: Int(carbonModifiers))))
+        }
     }
 
-    func resume() {
-        apply()
+    func endCapture() {
+        hotKeys.interceptor = nil
     }
 
     /// Unregisters everything and registers the current bindings again.
