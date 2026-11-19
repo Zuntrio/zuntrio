@@ -27,7 +27,7 @@ permissions:
 jobs:
   release:
     if: vars.RELEASE_ENABLED == 'true'
-    runs-on: macos-latest
+    runs-on: macos-27
     timeout-minutes: 60
     env:
       VERSION: ${{ github.event.inputs.version || github.ref_name }}
