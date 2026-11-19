@@ -93,6 +93,10 @@ open -n -g "$APP" --args --poc-run leftHalf,maximize,undo \
 
 ## Pull requests
 
+Every pull request runs the **CI** checks (GitHub Actions): unit tests, the Xcode scheme's tests and a
+Universal Release build, plus checks that the Release app is Universal and contains no debug code.
+The check must pass before a pull request can be merged.
+
 - Keep each pull request small and focused.
 - Describe what changed, why, and how you tested it.
 - Make sure `swift test --package-path ZuntrioCore` and the Debug build pass.

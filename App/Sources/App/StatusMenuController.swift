@@ -198,9 +198,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     /// (NSMenuItem.preferredImageVisibility); earlier versions always show them.
     static func setIcon(_ image: NSImage?, on item: NSMenuItem) {
         item.image = image
+        // The API exists only in the macOS 27 SDK (Xcode 27, Swift 6.4). Older
+        // toolchains, such as CI's Xcode 26, skip it. Release builds must use
+        // Xcode 27, or macOS 27 users won't see the menu icons.
+        #if compiler(>=6.4)
         if #available(macOS 27.0, *), image != nil {
             item.preferredImageVisibility = .visible
         }
+        #endif
     }
 
     static func symbol(_ name: String) -> NSImage? {

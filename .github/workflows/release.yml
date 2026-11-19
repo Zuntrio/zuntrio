@@ -1,0 +1,121 @@
+name: Release
+
+# Builds a signed, notarized Universal Zuntrio.zip and attaches it to a DRAFT
+# GitHub release. Publishing the draft is a manual step.
+#
+# Disabled until the repository variable RELEASE_ENABLED is set to "true",
+# which should only happen once these secrets exist in the "release"
+# environment (each run waits for the owner's approval):
+#   DEVELOPER_ID_P12_BASE64   Developer ID Application certificate + key (.p12, base64)
+#   DEVELOPER_ID_P12_PASSWORD password of that .p12
+#   DEVELOPER_TEAM_ID         Apple team ID
+#   NOTARY_KEY_ID             App Store Connect API key ID (for notarytool)
+#   NOTARY_ISSUER_ID          App Store Connect API issuer ID
+#   NOTARY_KEY_P8_BASE64      the API key (.p8, base64)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, e.g. 0.1.0-beta.1 (no leading v)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: vars.RELEASE_ENABLED == 'true'
+    # Secrets live in the "release" environment, which requires the owner's
+    # approval before each run.
+    environment: release
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ github.event.inputs.version || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 27
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)
+          # Required: older Xcode would drop the macOS 27 menu-icon fix.
+          if [ -z "$XCODE" ]; then echo "::error::Xcode 27 is not available on this runner image. Build the release locally (docs: distribution plan) or wait for GitHub's image."; exit 1; fi
+          sudo xcode-select -s "$XCODE"
+
+      - name: Normalise the version
+        run: |
+          V="${VERSION#v}"
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+          echo "MARKETING=${V%%-*}" >> "$GITHUB_ENV"
+
+      - name: Import the Developer ID certificate into a temporary keychain
+        env:
+          P12: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/release.keychain-db"
+          KEYCHAIN_PASSWORD=$(openssl rand -hex 24)
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/id.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/id.p12" -k "$KEYCHAIN" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/id.p12"
+
+      - name: Build the signed Universal app
+        env:
+          TEAM_ID: ${{ secrets.DEVELOPER_TEAM_ID }}
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          xcodebuild -project Zuntrio.xcodeproj -scheme Zuntrio -configuration Release \
+            -destination 'generic/platform=macOS' -derivedDataPath build \
+            CODE_SIGN_IDENTITY="Developer ID Application" DEVELOPMENT_TEAM="$TEAM_ID" \
+            OTHER_CODE_SIGN_FLAGS=--timestamp \
+            MARKETING_VERSION="$MARKETING" CURRENT_PROJECT_VERSION="${{ github.run_number }}" build
+
+      - name: Verify the app
+        run: |
+          APP=build/Build/Products/Release/Zuntrio.app
+          codesign --verify --strict --verbose=2 "$APP"
+          if codesign -d --entitlements - "$APP" 2>&1 | grep -q get-task-allow; then echo "::error::get-task-allow present"; exit 1; fi
+          lipo -archs "$APP/Contents/MacOS/Zuntrio"
+          if strings -a "$APP/Contents/MacOS/Zuntrio" | grep -q -- '--poc-'; then echo "::error::debug harness present"; exit 1; fi
+
+      - name: Notarize and staple
+        env:
+          KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          ISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
+          P8: ${{ secrets.NOTARY_KEY_P8_BASE64 }}
+        run: |
+          APP=build/Build/Products/Release/Zuntrio.app
+          echo "$P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" --key "$RUNNER_TEMP/notary.p8" --key-id "$KEY_ID" --issuer "$ISSUER" --wait
+          rm "$RUNNER_TEMP/notary.p8"
+          xcrun stapler staple "$APP"
+          xcrun stapler validate "$APP"
+          spctl -a -vvv -t exec "$APP"
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          ditto -c -k --keepParent build/Build/Products/Release/Zuntrio.app dist/Zuntrio.zip
+          (cd dist && shasum -a 256 Zuntrio.zip > Zuntrio.zip.sha256 && cat Zuntrio.zip.sha256)
+
+      - name: Create a draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRE=""; case "$VERSION" in *-*) PRE="--prerelease";; esac
+          gh release create "v$VERSION" dist/Zuntrio.zip dist/Zuntrio.zip.sha256 \
+            --draft $PRE --title "Zuntrio $VERSION" --notes "Draft release. Add release notes before publishing."
+
+      - name: Remove the temporary keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/release.keychain-db" 2>/dev/null || true
