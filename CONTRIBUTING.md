@@ -43,6 +43,25 @@ xcodebuild -project Zuntrio.xcodeproj -scheme Zuntrio -configuration Debug \
   CODE_SIGN_IDENTITY="<your identity name>" build
 ```
 
+## Debug test harness
+
+Debug builds accept a few launch arguments for repeatable checks without touching your own
+windows. Launch them with `open` so macOS applies Zuntrio's Accessibility permission (not
+your terminal's):
+
+```sh
+APP=build/DerivedData/Build/Products/Debug/Zuntrio.app   # with -derivedDataPath build/DerivedData
+open -n -g "$APP" --args --poc-fixture-host                # a test window with min/max size, in its own process
+open -n -g "$APP" --args --poc-run leftHalf,maximize,undo \
+  --poc-target-pid <test window pid> --poc-output /tmp/result.json --poc-restore
+```
+
+- `--poc-fixture-kind panel|dialog|minimized|sheet|ignore|ignore-later` shows window types
+  that Zuntrio should refuse or handle specially.
+- `--poc-fixture-hang <delay>,<seconds>` simulates an app that stops responding.
+- Results are JSON with geometry only.
+- Never point the harness at a window you are working in.
+
 ## Project layout
 
 - `ZuntrioCore/` is a Swift package with no AppKit or Accessibility API use. It holds layout
@@ -60,6 +79,8 @@ xcodebuild -project Zuntrio.xcodeproj -scheme Zuntrio -configuration Debug \
 - **Tests:** every change to `ZuntrioCore` needs unit tests. For behaviour that depends on
   macOS (window moves, permissions, displays), describe how you tested it: app, macOS version,
   Mac model and display setup.
+- **Compatibility reports are especially welcome:** macOS 14, 15 and 26, Intel Macs, and apps
+  that don't move as expected.
 - **No false success:** read the window frame back after setting it, and report any mismatch
   or error.
 - **Privacy:** no network access, telemetry or analytics. Never log window titles, document

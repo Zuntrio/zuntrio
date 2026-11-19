@@ -1,78 +1,142 @@
 # Zuntrio
 
-Zuntrio is a free, open-source window manager for macOS. You move and resize windows with
-keyboard shortcuts. It is inspired by [Spectacle](https://github.com/eczarny/spectacle), which
-is no longer maintained, and keeps the same keyboard-first workflow.
+Zuntrio is a free, open-source window manager for macOS. Move and resize windows with
+keyboard shortcuts: halves, thirds, corners, maximize, center, and moving windows between
+displays.
 
-> **Status: early development.** All Spectacle window actions, including undo/redo, work with
-> configurable shortcuts. Multi-display testing is still in progress. No release has been published.
+It is inspired by [Spectacle](https://github.com/eczarny/spectacle), which is no longer
+maintained, and uses the same default shortcuts, so former Spectacle users can keep their
+muscle memory.
+
+> **Status: beta in preparation.** No release has been published yet.
+
+## Why Zuntrio
+
+Spectacle made it effortless to arrange windows without reaching for the mouse: a few
+memorable shortcuts, no setup, nothing in the way. Many people still use it every day. But
+its repository is archived, and its last release (2017) predates Apple Silicon, so it runs
+through Rosetta. Apple has announced that general Rosetta support ends after macOS 27.
+
+Zuntrio exists so that workflow doesn't disappear. It aims to be:
+
+- **familiar:** the same actions and default shortcuts as Spectacle;
+- **native and maintained:** a modern Swift app for Apple Silicon and Intel, built for
+  current versions of macOS;
+- **free and open:** no subscription, account, ads or paywall, and MIT-licensed source;
+- **trustworthy:** no network access or telemetry, and it tells you honestly when an app
+  won't let a window move.
 
 ## Requirements
 
 - macOS 14 Sonoma or later
-- Apple Silicon. The build is Universal (Apple Silicon and Intel), but it has not been tested
-  on Intel hardware yet.
+- Apple Silicon or Intel (Universal app). See [Compatibility](#compatibility) for what has
+  actually been tested.
+
+## Install
+
+1. Download `Zuntrio.zip` from the [Releases](https://github.com/Zuntrio) page *(available
+   with the first beta)*.
+2. Unzip it and move **Zuntrio** to your **Applications** folder.
+3. Open Zuntrio. Its icon appears in the menu bar. There is no Dock icon.
+4. Grant Accessibility access when asked (see below).
+
+To build it yourself, see [Building from source](#building-from-source).
 
 ## Accessibility permission
 
-Zuntrio needs **Accessibility** access to move and resize other apps' windows. Choose
-**Grant Accessibility Access…** from the Zuntrio menu-bar item, or open
-**System Settings → Privacy & Security → Accessibility** and turn on Zuntrio.
+macOS only lets one app move another app's windows with **Accessibility** access. On first
+launch, Zuntrio opens a short welcome window that explains this and links to the right
+place in System Settings:
 
-Zuntrio uses this access only to read and set the position and size of the focused window.
+**System Settings → Privacy & Security → Accessibility → turn on Zuntrio**
 
-## Launch at login
-
-Turn on **Launch Zuntrio at login** in Settings. It is off by default.
-
-## Privacy
-
-- Zuntrio makes no network connections.
-- It has no telemetry, analytics or account.
-- It never reads or stores window titles, document names, keystrokes or app activity.
-- Settings stay on your Mac.
+Zuntrio uses this access only to read and change the position and size of the window you
+are working in. You can revoke it at any time. Zuntrio notices, dims its menu-bar icon,
+and shows the welcome window again the next time you use a shortcut.
 
 ## Shortcuts
 
-The defaults match Spectacle's, so former Spectacle users can keep their muscle memory.
+| Action | Default (Spectacle) | Alternative (⌃⌥) |
+|---|---|---|
+| Center | ⌥⌘C | ⌃⌥C |
+| Maximize | ⌥⌘F | ⌃⌥↩ |
+| Left / Right half | ⌥⌘← / ⌥⌘→ | ⌃⌥← / ⌃⌥→ |
+| Top / Bottom half | ⌥⌘↑ / ⌥⌘↓ | ⌃⌥↑ / ⌃⌥↓ |
+| Upper left / Upper right | ⌃⌘← / ⌃⌘→ | ⌃⌥U / ⌃⌥I |
+| Lower left / Lower right | ⌃⇧⌘← / ⌃⇧⌘→ | ⌃⌥J / ⌃⌥K |
+| Next / Previous third | ⌃⌥→ / ⌃⌥← | ⌃⌥⇧→ / ⌃⌥⇧← |
+| Make larger / smaller | ⌃⌥⇧→ / ⌃⌥⇧← | ⌃⌥= / ⌃⌥- |
+| Next / Previous display | ⌃⌥⌘→ / ⌃⌥⌘← | ⌃⌥⌘→ / ⌃⌥⌘← |
+| Undo / Redo | ⌥⌘Z / ⌥⇧⌘Z | ⌃⌥Z / ⌃⌥⇧Z |
 
-| Action | Shortcut |
+How the actions behave:
+
+- **Halves and corners:** pressing the shortcut again cycles the size ½ → ⅔ → ⅓.
+- **Next/Previous third:** steps through three columns, then three rows.
+- **Make larger/smaller:** grows or shrinks the window by 30 pt. Edges that touch the
+  screen edge stay there.
+- **Next/Previous display:** keeps the window's relative position and size. Displays are
+  ordered left to right, then top to bottom.
+- **Undo/Redo:** separate for each window, up to 50 steps. Cleared when Zuntrio quits.
+
+Every action is also in the menu-bar menu.
+
+**Settings…** (in the menu) lets you:
+
+- switch to the **Alternative (⌃⌥)** preset, which leaves ⌥⌘←/→ free for switching tabs
+  in browsers;
+- record your own shortcut for any action (Esc cancels, ⌫ clears);
+- turn individual shortcuts off;
+- restore the defaults;
+- launch Zuntrio at login (off by default).
+
+Every shortcut must include ⌘ or ⌃. Zuntrio warns you if a shortcut is already taken by
+another app or is also a macOS keyboard shortcut.
+
+## When a window doesn't move
+
+Zuntrio checks where each window actually ended up and never reports success it didn't get.
+You'll hear a beep, and the menu's "Last:" line explains why:
+
+- **The app limited the size.** Many apps have a minimum or maximum window size.
+  Terminal-style apps resize in whole rows and columns.
+- **Unsupported window.** Dialogs, floating panels, sheets, minimized windows and native
+  full-screen windows aren't moved.
+- **App isn't responding.** Zuntrio gives up after half a second and stays responsive.
+- **Some apps don't support Accessibility fully** and can't be moved at all.
+
+## Compatibility
+
+Tested so far (beta preparation):
+
+| | Tested |
 |---|---|
-| Center | ⌥⌘C |
-| Maximize | ⌥⌘F |
-| Left / Right half | ⌥⌘← / ⌥⌘→ |
-| Top / Bottom half | ⌥⌘↑ / ⌥⌘↓ |
-| Upper left / Upper right | ⌃⌘← / ⌃⌘→ |
-| Lower left / Lower right | ⌃⇧⌘← / ⌃⇧⌘→ |
-| Next / Previous third | ⌃⌥→ / ⌃⌥← |
-| Larger / Smaller | ⌃⌥⇧→ / ⌃⌥⇧← |
-| Next / Previous display | ⌃⌥⌘→ / ⌃⌥⌘← |
-| Undo / Redo | ⌥⌘Z / ⌥⇧⌘Z |
+| macOS | 27.2.1 |
+| Mac | Apple Silicon (M1) |
+| Displays | Built-in Retina + external 2560×1440, arranged above and side by side; plugging and unplugging |
+| Apps | TextEdit, Safari, Google Chrome, Visual Studio Code, Terminal |
 
-- Pressing a half or corner shortcut repeatedly cycles the size ½ → ⅔ → ⅓.
-- Next/Previous Third steps through three columns, then three rows.
-- Moving to another display keeps the window's relative position and size.
-- Undo/Redo is kept separately for each window, up to 50 steps. It is cleared when Zuntrio quits.
-- In **Settings…** (in the Zuntrio menu) you can:
-  - record your own shortcut for any action (Esc cancels, ⌫ clears);
-  - turn individual shortcuts on or off;
-  - restore the defaults;
-  - switch to the **Alternative (⌃⌥)** preset, which leaves ⌥⌘←/→ free for browsers' tab switching.
-- Every shortcut must include ⌘ or ⌃.
-- Zuntrio warns when a shortcut is already taken by another app or may clash with a macOS
-  keyboard shortcut.
+**Not tested yet:** macOS 14, 15 and 26, and Intel Macs. The app is built for them, but
+please report what you find.
 
-Alternative preset:
+## Privacy
 
-| Action | Shortcut |
-|---|---|
-| Center / Maximize | ⌃⌥C / ⌃⌥↩ |
-| Left / Right / Top / Bottom half | ⌃⌥← / ⌃⌥→ / ⌃⌥↑ / ⌃⌥↓ |
-| Upper left / Upper right / Lower left / Lower right | ⌃⌥U / ⌃⌥I / ⌃⌥J / ⌃⌥K |
-| Next / Previous third | ⌃⌥⇧→ / ⌃⌥⇧← |
-| Larger / Smaller | ⌃⌥= / ⌃⌥- |
-| Next / Previous display | ⌃⌥⌘→ / ⌃⌥⌘← |
-| Undo / Redo | ⌃⌥Z / ⌃⌥⇧Z |
+- No network connections, no telemetry or analytics, no account.
+- Zuntrio never reads window contents, window titles, document names or keystrokes, and
+  doesn't track which apps you use.
+- Settings (your shortcuts) are stored only on your Mac.
+- Diagnostic logs stay on your Mac and contain only action names, window positions and
+  sizes, and error codes.
+
+## Uninstall
+
+1. Quit Zuntrio (menu-bar icon → **Quit Zuntrio**).
+2. If you turned on **Launch at login**, turn it off in Settings first, or remove Zuntrio
+   in System Settings → General → Login Items.
+3. Delete **Zuntrio** from Applications.
+4. Optionally remove its settings and its Accessibility entry:
+   - Run `defaults delete app.zuntrio.Zuntrio` in Terminal.
+   - Remove Zuntrio from System Settings → Privacy & Security → Accessibility with **–**.
 
 ## Building from source
 
@@ -88,6 +152,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for tests and development notes.
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE). Zuntrio has no third-party dependencies.
 
-Zuntrio is an independent project. It is not affiliated with or endorsed by Spectacle or its author.
+Zuntrio is an independent project. It is not affiliated with or endorsed by Spectacle or its
+author.
