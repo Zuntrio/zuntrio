@@ -22,6 +22,8 @@ import ZuntrioCore
 @MainActor
 enum ProofOfConceptRun {
     private static var fixture: FixtureWindowController?
+    /// Extra test windows for `--poc-fixture-kind`; kept alive while the host runs.
+    private static var extraWindows: [NSWindow] = []
 
     /// `--poc-shortcut-report <path>` writes registration results and macOS
     /// shortcut conflicts for every preset, then quits.
@@ -117,6 +119,11 @@ enum ProofOfConceptRun {
             let controller = FixtureWindowController()
             fixture = controller
             controller.show()
+            // "--poc-fixture-kind panel|dialog|minimized|sheet": window types
+            // Zuntrio should refuse or handle specially.
+            if let kind = value(after: "--poc-fixture-kind", in: arguments) {
+                showFixtureVariant(kind, main: controller)
+            }
             // "--poc-fixture-hang <delay>,<duration>" (seconds): block this
             // process's main thread to simulate an app that stops responding.
             if let spec = value(after: "--poc-fixture-hang", in: arguments)?.split(separator: ",").compactMap({ Double($0) }),
@@ -201,6 +208,37 @@ enum ProofOfConceptRun {
             ]
             write(document, to: output)
             NSApp.terminate(nil)
+        }
+    }
+
+    private static func showFixtureVariant(_ kind: String, main: FixtureWindowController) {
+        func panel(_ style: NSWindow.StyleMask, title: String) -> NSPanel {
+            let panel = NSPanel(contentRect: NSRect(x: 300, y: 300, width: 320, height: 200),
+                                styleMask: style, backing: .buffered, defer: false)
+            panel.title = title
+            panel.isReleasedWhenClosed = false
+            return panel
+        }
+        switch kind {
+        case "panel":
+            let floating = panel([.titled, .closable, .utilityWindow], title: "Zuntrio Test Panel")
+            floating.isFloatingPanel = true
+            floating.makeKeyAndOrderFront(nil)
+            extraWindows.append(floating)
+        case "dialog":
+            let dialog = panel([.titled, .closable], title: "Zuntrio Test Dialog")
+            dialog.makeKeyAndOrderFront(nil)
+            extraWindows.append(dialog)
+        case "minimized":
+            main.window.miniaturize(nil)
+        case "sheet":
+            let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 150),
+                                 styleMask: [.titled], backing: .buffered, defer: false)
+            sheet.isReleasedWhenClosed = false
+            extraWindows.append(sheet)
+            main.window.beginSheet(sheet)
+        default:
+            break
         }
     }
 

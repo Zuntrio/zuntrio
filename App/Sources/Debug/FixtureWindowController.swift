@@ -8,7 +8,7 @@ final class FixtureWindowController {
     static let minimumContentSize = NSSize(width: 600, height: 400)
     static let maximumContentSize = NSSize(width: 1000, height: 700)
 
-    private lazy var window: NSWindow = {
+    private(set) lazy var window: NSWindow = {
         let window = NSWindow(
             contentRect: NSRect(x: 200, y: 200, width: 700, height: 500),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
