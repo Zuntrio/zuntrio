@@ -77,7 +77,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             menu.addItem(info("⚠︎ \(shortcuts.failures.count) shortcut(s) in use by another app"))
         }
         if !shortcuts.systemConflicts.isEmpty {
-            menu.addItem(info("⚠︎ \(shortcuts.systemConflicts.count) shortcut(s) may clash with macOS shortcuts"))
+            menu.addItem(info("⚠︎ \(shortcuts.systemConflicts.count) shortcut(s) also used by macOS"))
         }
         menu.addItem(info("Last: " + (runner.lastReport?.summary ?? "none")))
 
@@ -137,7 +137,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         if shortcuts.failures[action] != nil {
             detail += "  ⚠︎ in use by another app"
         } else if shortcuts.systemConflicts.contains(action) {
-            detail += "  ⚠︎ may clash with a macOS shortcut"
+            detail += "  ⚠︎ also a macOS shortcut"
         }
         let text = "\(title)\t\(detail)"
         let menuItem = item(text, selector)

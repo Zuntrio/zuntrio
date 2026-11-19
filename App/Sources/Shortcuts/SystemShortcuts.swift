@@ -18,18 +18,15 @@ enum SystemShortcuts {
             guard (entry["kHISymbolicHotKeyEnabled"] as? Bool) == true,
                   let code = entry["kHISymbolicHotKeyCode"] as? Int, code >= 0, code < 0xFFFF,
                   let carbonModifiers = entry["kHISymbolicHotKeyModifiers"] as? Int else { continue }
-            // The Fn flag is set on arrow keys by default, so for arrows it doesn't
-            // tell us whether Fn/Globe must be held: keep those as possible
-            // conflicts. On any other key it means a Globe shortcut, which
-            // Zuntrio can't register and so can't collide with.
-            let fnHeld = carbonModifiers & Int(kEventKeyModifierFnMask) != 0
-            if fnHeld && !arrowKeys.contains(code) { continue }
+            // The Fn flag means Fn/Globe must be held (macOS lists entries on
+            // bare arrows with only that flag, and a key-press test showed
+            // ⌃⌥⇧→ reaching Zuntrio, not the matching Fn-flagged tiling entry).
+            // Zuntrio can't register Globe shortcuts, so these never collide.
+            if carbonModifiers & Int(kEventKeyModifierFnMask) != 0 { continue }
             result.insert(KeyCombo(keyCode: UInt16(code), modifiers: modifiers(fromCarbon: carbonModifiers)))
         }
         return result
     }
-
-    private static let arrowKeys: Set<Int> = [kVK_LeftArrow, kVK_RightArrow, kVK_DownArrow, kVK_UpArrow]
 
     static func modifiers(fromCarbon mask: Int) -> ShortcutModifiers {
         var modifiers: ShortcutModifiers = []
