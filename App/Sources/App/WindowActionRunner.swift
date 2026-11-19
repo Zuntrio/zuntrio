@@ -52,44 +52,101 @@ struct ActionReport: Sendable, Equatable {
     }
 }
 
-/// Runs a layout action on the focused window: read → compute → set → read
-/// back → verify. Never reports success unless the read-back matches.
+/// Runs window actions: read → compute → set → read back → verify. Never
+/// reports success unless the read-back matches.
 ///
-/// Runs synchronously on the main thread. Every AX call is bounded by a 0.5 s
-/// messaging timeout, and each press recomputes from the window's current
-/// geometry, so rapid presses can't act on stale state.
+/// Concurrency:
+/// - Accessibility calls run on `AXWorker`'s background queue; the main thread
+///   only reads displays and updates memory/history between those steps.
+/// - Actions run strictly one after another, in the order pressed, each
+///   starting from the window's current geometry.
+/// - At most `maxQueued` actions wait at once; further presses are refused
+///   (with a beep) so a hung app can't pile up work.
 @MainActor
 final class WindowActionRunner {
+    static let maxQueued = 4
+
     private let provider: any WindowProviding
+    private let worker = AXWorker()
+    /// Debug/test only: act on this process instead of the frontmost app.
+    private let targetPID: pid_t?
+
     private(set) var lastReport: ActionReport?
+    private(set) var droppedCount = 0
     var onReport: ((ActionReport) -> Void)?
+
+    private var queue: [(action: WindowAction, done: CheckedContinuation<ActionReport, Never>?)] = []
+    private(set) var isBusy = false
 
     /// Last action applied, for cycling. Only one window is remembered:
     /// cycling needs consecutive presses on the same window.
-    private var memory: (window: AnyHashable, layout: LayoutMemory)?
+    private var memory: (window: WindowID, layout: LayoutMemory)?
     /// Undo/redo history per window (in memory only, never persisted).
-    private var history = WindowHistory<AnyHashable>()
+    private var history = WindowHistory<WindowID>()
 
-    init(provider: any WindowProviding) {
+    init(provider: any WindowProviding, targetPID: pid_t? = nil) {
         self.provider = provider
+        self.targetPID = targetPID
     }
 
-    @discardableResult
-    func perform(_ action: WindowAction) -> ActionReport {
-        let report = run(action)
+    /// Queues an action (shortcut or menu). Returns immediately.
+    func perform(_ action: WindowAction) {
+        enqueue(action, done: nil)
+    }
+
+    /// Queues an action and waits for its report.
+    func performAndWait(_ action: WindowAction) async -> ActionReport {
+        await withCheckedContinuation { continuation in
+            enqueue(action, done: continuation)
+        }
+    }
+
+    private func enqueue(_ action: WindowAction, done: CheckedContinuation<ActionReport, Never>?) {
+        guard queue.count < Self.maxQueued else {
+            droppedCount += 1
+            let report = ActionReport(action: action, result: .failed(.busy))
+            finish(report)
+            done?.resume(returning: report)
+            return
+        }
+        queue.append((action, done))
+        guard !isBusy else { return }
+        isBusy = true
+        Task { await drain() }
+    }
+
+    private func drain() async {
+        while !queue.isEmpty {
+            let (action, done) = queue.removeFirst()
+            let report = await run(action)
+            finish(report)
+            done?.resume(returning: report)
+        }
+        isBusy = false
+    }
+
+    private func finish(_ report: ActionReport) {
         lastReport = report
         log(report)
         if report.result != .exact { NSSound.beep() }
         onReport?(report)
-        return report
     }
 
-    private func run(_ action: WindowAction) -> ActionReport {
+    private func run(_ action: WindowAction) async -> ActionReport {
         do throws(WindowAccessError) {
-            let window = try provider.focusedWindow()
-            let before = try window.frame()
+            guard AccessibilityPermission.isTrusted else { throw .notTrusted }
+            guard let pid = targetPID ?? NSWorkspace.shared.frontmostApplication?.processIdentifier else {
+                throw .noFrontmostApplication
+            }
+            let provider = self.provider
+            let snapshot = try await worker.run { () throws(WindowAccessError) -> WindowSnapshot in
+                let window = try provider.focusedWindow(pid: pid)
+                return WindowSnapshot(window: window, frame: try window.frame())
+            }
+            let window = snapshot.window
+            let before = snapshot.frame
             if action.isHistory {
-                return try runHistory(action, window: window, before: before)
+                return try await runHistory(action, window: window, before: before)
             }
 
             let displays = DisplayProvider.current()
@@ -116,7 +173,9 @@ final class WindowActionRunner {
                 return ActionReport(action: action, result: .alreadyInPlace, before: before, requested: target, actual: before)
             }
 
-            let actual = try window.setFrame(target)
+            let actual = try await worker.run { () throws(WindowAccessError) -> CGRect in
+                try window.setFrame(target)
+            }
             memory = (window.identity, LayoutMemory(
                 action: action, cycleIndex: layout.cycleIndex, requestedFrame: target, resultingFrame: actual
             ))
@@ -136,7 +195,7 @@ final class WindowActionRunner {
     /// actually set, so a failed restore can be retried.
     private func runHistory(
         _ action: WindowAction, window: any ManagedWindow, before: CGRect
-    ) throws(WindowAccessError) -> ActionReport {
+    ) async throws(WindowAccessError) -> ActionReport {
         let key = window.identity
         let isUndo = action == .undo
         guard let entry = isUndo ? history.nextUndo(for: key) : history.nextRedo(for: key) else {
@@ -153,13 +212,28 @@ final class WindowActionRunner {
             commit()
             return ActionReport(action: action, result: .alreadyInPlace, before: before, requested: target, actual: before)
         }
-        let actual = try window.setFrame(target)
+        let actual = try await worker.run { () throws(WindowAccessError) -> CGRect in
+            try window.setFrame(target)
+        }
         commit()
         return ActionReport(
             action: action, result: Self.result(before: before, requested: target, actual: actual),
             before: before, requested: target, actual: actual
         )
     }
+
+    #if DEBUG
+    /// Test harness only: sets the target window's frame directly.
+    func setFrameDirectly(_ frame: CGRect) async throws(WindowAccessError) -> CGRect {
+        guard let pid = targetPID ?? NSWorkspace.shared.frontmostApplication?.processIdentifier else {
+            throw .noFrontmostApplication
+        }
+        let provider = self.provider
+        return try await worker.run { () throws(WindowAccessError) -> CGRect in
+            try provider.focusedWindow(pid: pid).setFrame(frame)
+        }
+    }
+    #endif
 
     private static func result(before: CGRect, requested: CGRect, actual: CGRect) -> ActionReport.Result {
         switch FrameVerification.outcome(before: before, requested: requested, actual: actual) {
@@ -178,4 +252,9 @@ final class WindowActionRunner {
             before=\(before, privacy: .public) requested=\(requested, privacy: .public) actual=\(actual, privacy: .public)
             """)
     }
+}
+
+private struct WindowSnapshot: Sendable {
+    let window: any ManagedWindow
+    let frame: CGRect
 }

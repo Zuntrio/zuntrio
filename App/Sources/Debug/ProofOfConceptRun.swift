@@ -117,6 +117,15 @@ enum ProofOfConceptRun {
             let controller = FixtureWindowController()
             fixture = controller
             controller.show()
+            // "--poc-fixture-hang <delay>,<duration>" (seconds): block this
+            // process's main thread to simulate an app that stops responding.
+            if let spec = value(after: "--poc-fixture-hang", in: arguments)?.split(separator: ",").compactMap({ Double($0) }),
+               spec.count == 2 {
+                // A deliberate, blocking main-thread stall (not Task.sleep, which would yield).
+                DispatchQueue.main.asyncAfter(deadline: .now() + spec[0]) {
+                    Thread.sleep(forTimeInterval: spec[1])
+                }
+            }
             return
         }
         guard let actionsArgument = value(after: "--poc-run", in: arguments),
@@ -135,27 +144,46 @@ enum ProofOfConceptRun {
             NSApp.terminate(nil)
             return
         }
-        let provider: any WindowProviding = targetPID.map { ProcessWindowProvider(pid: $0) } ?? AXWindowProvider()
-        let runner = targetPID == nil ? defaultRunner : WindowActionRunner(provider: provider)
+        let runner = targetPID.map {
+            WindowActionRunner(provider: AXWindowProvider(fallbackToFirstStandardWindow: true), targetPID: $0)
+        } ?? defaultRunner
         let restore = arguments.contains("--poc-restore")
+        let burst = arguments.contains("--poc-burst")
+        let pause = value(after: "--poc-pause-ms", in: arguments).flatMap(Int.init) ?? 400
 
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1))
+            let heartbeat = MainThreadHeartbeat()
+            heartbeat.start()
 
             var entries: [[String: Any]] = []
-            for action in actions {
-                let report = runner.perform(action)
-                entries.append(encode(report))
-                try? await Task.sleep(for: .milliseconds(400))
+            if burst {
+                // All presses at once, as fast as a user could mash a key.
+                // Reports arrive in completion order (dropped presses first).
+                var collected: [[String: Any]] = []
+                runner.onReport = { collected.append(encode($0)) }
+                for action in actions { runner.perform(action) }
+                while runner.isBusy { try? await Task.sleep(for: .milliseconds(20)) }
+                runner.onReport = nil
+                entries = collected
+            } else {
+                for action in actions {
+                    let started = Date()
+                    var entry = encode(await runner.performAndWait(action))
+                    entry["ms"] = Int(Date().timeIntervalSince(started) * 1000)
+                    entries.append(entry)
+                    try? await Task.sleep(for: .milliseconds(pause))
+                }
             }
+            heartbeat.stop()
 
             // Put the window back where it started, so tests against real
             // apps leave the user's layout untouched.
             var restored: [String: Any] = [:]
-            if restore, let original = entries.first.flatMap({ $0["before"] as? [Double] }), original.count == 4 {
+            if restore, let original = entries.lazy.compactMap({ $0["before"] as? [Double] }).first, original.count == 4 {
                 let frame = CGRect(x: original[0], y: original[1], width: original[2], height: original[3])
                 do throws(WindowAccessError) {
-                    let actual = try provider.focusedWindow().setFrame(frame)
+                    let actual = try await runner.setFrameDirectly(frame)
                     restored = ["requested": rect(frame), "actual": rect(actual)]
                 } catch {
                     restored = ["error": error.description]
@@ -168,27 +196,40 @@ enum ProofOfConceptRun {
                 "displays": DisplayProvider.current().map { ["frame": rect($0.frame), "visibleFrame": rect($0.visibleFrame)] },
                 "results": entries,
                 "restore": restored,
+                "dropped": runner.droppedCount,
+                "maxMainThreadGapMs": heartbeat.maxGapMs,
             ]
             write(document, to: output)
             NSApp.terminate(nil)
         }
     }
 
-    /// Targets the first standard window of a given process instead of the
-    /// frontmost app. Debug only.
-    private struct ProcessWindowProvider: WindowProviding {
-        let pid: pid_t
+    /// Measures the longest gap between main-thread timer ticks, i.e. how long
+    /// the main thread was blocked.
+    @MainActor
+    private final class MainThreadHeartbeat {
+        private var timer: Timer?
+        private var last = Date()
+        private(set) var maxGapMs = 0
 
-        func focusedWindow() throws(WindowAccessError) -> any ManagedWindow {
-            guard AccessibilityPermission.isTrusted else { throw .notTrusted }
-            let app = AXUIElementCreateApplication(pid)
-            AXUIElementSetMessagingTimeout(app, 0.5)
-            let value = try AX.copyAttribute(app, kAXWindowsAttribute)
-            guard let windows = value as? [AXUIElement] else { throw .noFocusedWindow }
-            for window in windows where AX.string(window, kAXSubroleAttribute) == kAXStandardWindowSubrole {
-                return AXWindow(element: window, application: app)
+        func start() {
+            last = Date()
+            let timer = Timer(timeInterval: 0.02, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.tick() }
             }
-            throw .noFocusedWindow
+            RunLoop.main.add(timer, forMode: .common)
+            self.timer = timer
+        }
+
+        func stop() {
+            tick()
+            timer?.invalidate()
+        }
+
+        private func tick() {
+            let now = Date()
+            maxGapMs = max(maxGapMs, Int(now.timeIntervalSince(last) * 1000))
+            last = now
         }
     }
 

@@ -1,27 +1,39 @@
 import AppKit
 import ApplicationServices
 
-/// Upper bound for any single AX call. Without it a hung target app can block
-/// the main thread for the system default (~6 s).
+/// Upper bound for any single AX call. Without it a hung target app could
+/// hold the Accessibility queue for the system default (~6 s) per call.
 private let messagingTimeout: Float = 0.5
 
-/// Finds the focused window of the frontmost application.
-@MainActor
+/// Finds the focused window of an application.
 struct AXWindowProvider: WindowProviding {
-    func focusedWindow() throws(WindowAccessError) -> any ManagedWindow {
-        guard AccessibilityPermission.isTrusted else { throw .notTrusted }
-        guard let app = NSWorkspace.shared.frontmostApplication else { throw .noFrontmostApplication }
+    /// Debug/test use only: if the app reports no focused window, use its first
+    /// standard window. Never enabled for real shortcuts, where it could move
+    /// a window the user didn't expect.
+    var fallbackToFirstStandardWindow = false
 
-        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+    func focusedWindow(pid: pid_t) throws(WindowAccessError) -> any ManagedWindow {
+        guard AccessibilityPermission.isTrusted else { throw .notTrusted }
+
+        let appElement = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(appElement, messagingTimeout)
 
-        let windowValue: CFTypeRef
-        do {
-            windowValue = try AX.copyAttribute(appElement, kAXFocusedWindowAttribute)
+        let window: AXUIElement
+        do throws(WindowAccessError) {
+            let value = try AX.copyAttribute(appElement, kAXFocusedWindowAttribute)
+            guard let element = AX.element(from: value) else { throw .noFocusedWindow }
+            window = element
         } catch .accessibilityFailure(_, let code) where code == AXError.noValue.rawValue {
-            throw .noFocusedWindow
+            guard fallbackToFirstStandardWindow, let first = AX.firstStandardWindow(of: appElement) else {
+                throw .noFocusedWindow
+            }
+            window = first
+        } catch .noFocusedWindow {
+            guard fallbackToFirstStandardWindow, let first = AX.firstStandardWindow(of: appElement) else {
+                throw .noFocusedWindow
+            }
+            window = first
         }
-        guard let window = AX.element(from: windowValue) else { throw .noFocusedWindow }
         AXUIElementSetMessagingTimeout(window, messagingTimeout)
 
         try AX.rejectUnsupported(window)
@@ -29,8 +41,9 @@ struct AXWindowProvider: WindowProviding {
     }
 }
 
-@MainActor
-final class AXWindow: ManagedWindow {
+/// AXUIElement is an immutable CF reference and the Accessibility API may be
+/// called from any thread; Zuntrio confines all calls to the AXWorker queue.
+final class AXWindow: ManagedWindow, @unchecked Sendable {
     private let element: AXUIElement
     private let application: AXUIElement
 
@@ -39,9 +52,7 @@ final class AXWindow: ManagedWindow {
         self.application = application
     }
 
-    /// AXUIElement equality/hash are CFEqual/CFHash, which identify the same
-    /// window across separate lookups.
-    var identity: AnyHashable { AnyHashable(element) }
+    var identity: WindowID { WindowID(base: AnyHashable(element)) }
 
     func frame() throws(WindowAccessError) -> CGRect {
         let position = try AX.copyPoint(element, kAXPositionAttribute)
@@ -50,17 +61,17 @@ final class AXWindow: ManagedWindow {
     }
 
     func setFrame(_ target: CGRect) throws(WindowAccessError) -> CGRect {
-        guard AX.isSettable(element, kAXPositionAttribute) else {
+        guard try AX.isSettable(element, kAXPositionAttribute) else {
             throw .attributeNotSettable(attribute: "position")
         }
-        guard AX.isSettable(element, kAXSizeAttribute) else {
+        guard try AX.isSettable(element, kAXSizeAttribute) else {
             throw .attributeNotSettable(attribute: "size")
         }
 
         // Some apps (notably Chromium/Electron) animate or partly ignore frame
         // changes while AXEnhancedUserInterface is on (it is enabled by assistive
         // tech such as VoiceOver). Turn it off for the change and restore it after.
-        let restoreEnhancedUI = AX.disableEnhancedUserInterface(application)
+        let restoreEnhancedUI = try AX.disableEnhancedUserInterface(application)
         defer {
             if restoreEnhancedUI { AX.setEnhancedUserInterface(application, true) }
         }
@@ -78,16 +89,23 @@ final class AXWindow: ManagedWindow {
 }
 
 /// Thin, typed wrappers over the C Accessibility API.
-@MainActor
 enum AX {
     static func copyAttribute(_ element: AXUIElement, _ attribute: String) throws(WindowAccessError) -> CFTypeRef {
         var value: CFTypeRef?
         let error = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+        if error == .cannotComplete { throw .appNotResponding }
         guard error == .success, let value else {
             let code = error == .success ? AXError.noValue.rawValue : error.rawValue
             throw .accessibilityFailure(operation: "Read \(attribute)", code: code)
         }
         return value
+    }
+
+    static func firstStandardWindow(of app: AXUIElement) -> AXUIElement? {
+        guard let value = try? copyAttribute(app, kAXWindowsAttribute),
+              let windows = value as? [AXUIElement] else { return nil }
+        // Debug fallback only; an unreadable subrole simply doesn't match.
+        return windows.first { (try? string($0, kAXSubroleAttribute)) == kAXStandardWindowSubrole }
     }
 
     static func element(from value: CFTypeRef) -> AXUIElement? {
@@ -141,31 +159,39 @@ enum AX {
 
     private static func set(_ element: AXUIElement, _ attribute: String, _ value: CFTypeRef) throws(WindowAccessError) {
         let error = AXUIElementSetAttributeValue(element, attribute as CFString, value)
+        if error == .cannotComplete { throw .appNotResponding }
         guard error == .success else {
             throw .accessibilityFailure(operation: "Set \(attribute)", code: error.rawValue)
         }
     }
 
-    static func isSettable(_ element: AXUIElement, _ attribute: String) -> Bool {
+    static func isSettable(_ element: AXUIElement, _ attribute: String) throws(WindowAccessError) -> Bool {
         var settable: DarwinBoolean = false
         let error = AXUIElementIsAttributeSettable(element, attribute as CFString, &settable)
+        if error == .cannotComplete { throw .appNotResponding }
         if error != .success {
             Log.accessibility.debug("IsSettable \(attribute, privacy: .public) returned AXError \(error.rawValue)")
         }
         return error == .success && settable.boolValue
     }
 
-    static func bool(_ element: AXUIElement, _ attribute: String) -> Bool? {
+    /// Reads an attribute that may legitimately be missing. Returns nil when
+    /// it is absent or unreadable, but stops with `.appNotResponding` on a
+    /// timeout instead of waiting out the next call's timeout too.
+    private static func optionalValue(_ element: AXUIElement, _ attribute: String) throws(WindowAccessError) -> CFTypeRef? {
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
-              let value, CFGetTypeID(value) == CFBooleanGetTypeID() else { return nil }
+        let error = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+        if error == .cannotComplete { throw .appNotResponding }
+        return error == .success ? value : nil
+    }
+
+    static func bool(_ element: AXUIElement, _ attribute: String) throws(WindowAccessError) -> Bool? {
+        guard let value = try optionalValue(element, attribute), CFGetTypeID(value) == CFBooleanGetTypeID() else { return nil }
         return CFBooleanGetValue(unsafeDowncast(value, to: CFBoolean.self))
     }
 
-    static func string(_ element: AXUIElement, _ attribute: String) -> String? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
-              let value, CFGetTypeID(value) == CFStringGetTypeID() else { return nil }
+    static func string(_ element: AXUIElement, _ attribute: String) throws(WindowAccessError) -> String? {
+        guard let value = try optionalValue(element, attribute), CFGetTypeID(value) == CFStringGetTypeID() else { return nil }
         return unsafeDowncast(value, to: CFString.self) as String
     }
 
@@ -174,15 +200,15 @@ enum AX {
     /// report a subrole at all we let it through; the read-back will tell us
     /// whether the move worked.
     static func rejectUnsupported(_ window: AXUIElement) throws(WindowAccessError) {
-        if let subrole = string(window, kAXSubroleAttribute), subrole != kAXStandardWindowSubrole {
+        if let subrole = try string(window, kAXSubroleAttribute), subrole != kAXStandardWindowSubrole {
             throw .unsupportedWindow(reason: "subrole \(subrole)")
         }
-        if bool(window, kAXMinimizedAttribute) == true {
+        if try bool(window, kAXMinimizedAttribute) == true {
             throw .unsupportedWindow(reason: "minimized")
         }
         // "AXFullScreen" has no public constant; native full-screen windows live
         // in their own Space and can't be repositioned.
-        if bool(window, "AXFullScreen") == true {
+        if try bool(window, "AXFullScreen") == true {
             throw .unsupportedWindow(reason: "full screen")
         }
     }
@@ -190,8 +216,8 @@ enum AX {
     private static let enhancedUserInterface = "AXEnhancedUserInterface"
 
     /// Returns true if the attribute was on and has been turned off.
-    static func disableEnhancedUserInterface(_ app: AXUIElement) -> Bool {
-        guard bool(app, enhancedUserInterface) == true else { return false }
+    static func disableEnhancedUserInterface(_ app: AXUIElement) throws(WindowAccessError) -> Bool {
+        guard try bool(app, enhancedUserInterface) == true else { return false }
         return setEnhancedUserInterface(app, false)
     }
 
