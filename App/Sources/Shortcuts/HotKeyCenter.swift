@@ -67,6 +67,8 @@ final class HotKeyCenter {
         combos[id] = nil
     }
 
+    var registeredCount: Int { references.count }
+
     func unregisterAll() {
         for id in Array(references.keys) {
             unregister(id)

@@ -69,7 +69,7 @@ public struct KeyCombo: Sendable, Hashable, Codable {
         123: "←", 124: "→", 125: "↓", 126: "↑",
     ]
 
-    static func keyName(_ code: UInt16) -> String {
+    public static func keyName(_ code: UInt16) -> String {
         keyNames[code] ?? "Key \(code)"
     }
 }

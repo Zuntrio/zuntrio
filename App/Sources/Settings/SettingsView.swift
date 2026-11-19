@@ -9,6 +9,8 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 22) {
                 general
                 Divider()
+                disable
+                Divider()
                 shortcuts
             }
             .padding(24)
@@ -47,6 +49,50 @@ struct SettingsView: View {
             }
 
             Text("Zuntrio \(model.version)").font(.callout).foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Disable
+
+    private var disable: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Disable Shortcuts").font(.title2.weight(.semibold))
+            Text("While off, Zuntrio's shortcuts go to the app you're using instead.")
+                .font(.callout).foregroundStyle(.secondary)
+
+            if let until = model.pausedUntilText {
+                HStack {
+                    Label("Off until \(until)", systemImage: "pause.circle")
+                    Spacer()
+                    Button("Turn Back On") { model.resume() }
+                }
+            } else {
+                HStack {
+                    Picker("Turn off for", selection: Binding(get: { model.pauseHours }, set: { model.pauseHours = $0 })) {
+                        ForEach(Array(PauseSettings.hourRange), id: \.self) { hours in
+                            Text(hours == 1 ? "1 hour" : "\(hours) hours").tag(hours)
+                        }
+                    }
+                    .fixedSize()
+                    Button("Turn Off") { model.pauseNow() }
+                }
+            }
+
+            Text("Always off in these apps").font(.headline).padding(.top, 4)
+            if model.disabledApps.isEmpty {
+                Text("None. Add an app here, or use Disable Shortcuts in the menu while it's in front.")
+                    .font(.callout).foregroundStyle(.secondary)
+            } else {
+                ForEach(model.disabledApps, id: \.bundleID) { app in
+                    HStack {
+                        Text(app.name)
+                        Spacer()
+                        Button("Remove") { model.removeDisabledApp(app.bundleID) }
+                            .accessibilityLabel("Remove \(app.name)")
+                    }
+                }
+            }
+            Button("Add App…") { model.addDisabledApp() }
         }
     }
 

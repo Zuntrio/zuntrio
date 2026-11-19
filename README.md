@@ -93,6 +93,20 @@ Every action is also in the menu-bar menu.
 Every shortcut must include ⌘ or ⌃. Zuntrio warns you if a shortcut is already taken by
 another app or is also a macOS keyboard shortcut.
 
+## Disabling shortcuts
+
+Sometimes an app needs those keys itself. Turn Zuntrio's shortcuts off from **Disable
+Shortcuts** in the menu, or in Settings:
+
+- **For 1 hour**, or **for several hours** (1–24). They come back on by themselves, and the
+  menu shows when, with a **Turn Shortcuts Back On** option.
+- **In a specific app.** Choose it while that app is in front, for example
+  **In “Terminal”**. Zuntrio's shortcuts are then off whenever that app is in front, and on
+  everywhere else. Manage the list in Settings.
+
+While shortcuts are off, the key presses go to the app instead, and the menu-bar icon is
+dimmed. The window actions stay available from the menu.
+
 ## When a window doesn't move
 
 Zuntrio checks where each window actually ended up and never reports success it didn't get.
@@ -124,7 +138,8 @@ please report what you find.
 - No network connections, no telemetry or analytics, no account.
 - Zuntrio never reads window contents, window titles, document names or keystrokes, and
   doesn't track which apps you use.
-- Settings (your shortcuts) are stored only on your Mac.
+- Settings (your shortcuts, and any apps where you've turned them off) are stored only on
+  your Mac.
 - Diagnostic logs stay on your Mac and contain only action names, window positions and
   sizes, and error codes.
 
@@ -138,7 +153,7 @@ please report what you find.
 4. Optionally, remove everything Zuntrio left on your Mac. Run these in Terminal:
 
    ```sh
-   # Your shortcut settings (~/Library/Preferences/app.zuntrio.Zuntrio.plist)
+   # Your settings: shortcuts and disabled apps (~/Library/Preferences/app.zuntrio.Zuntrio.plist)
    defaults delete app.zuntrio.Zuntrio
 
    # Zuntrio's entry in System Settings → Privacy & Security → Accessibility
