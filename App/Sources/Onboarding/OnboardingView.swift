@@ -23,11 +23,17 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Welcome to Zuntrio")
-                    .font(.largeTitle.weight(.semibold))
-                Text("Move and resize windows with your keyboard. Zuntrio lives in the menu bar.")
-                    .foregroundStyle(.secondary)
+            HStack(alignment: .center, spacing: 16) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Welcome to Zuntrio")
+                        .font(.largeTitle.weight(.semibold))
+                    Text("Move and resize windows with your keyboard. Zuntrio lives in the menu bar.")
+                        .foregroundStyle(.secondary)
+                }
             }
 
             permissionCard

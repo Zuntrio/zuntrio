@@ -36,9 +36,12 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         super.init()
 
         if let button = statusItem.button {
-            // Placeholder SF Symbol until the owner approves a menu-bar icon.
-            button.image = NSImage(systemSymbolName: "rectangle.split.2x1", accessibilityDescription: "Zuntrio")
-            button.image?.isTemplate = true
+            // Template image: macOS tints it for light and dark menu bars.
+            let image = NSImage(named: "MenuBarIcon")
+                ?? NSImage(systemSymbolName: "rectangle.split.2x1", accessibilityDescription: nil)
+            image?.isTemplate = true
+            image?.accessibilityDescription = "Zuntrio"
+            button.image = image
         }
         let menu = NSMenu()
         menu.delegate = self
