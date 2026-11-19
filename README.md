@@ -125,13 +125,12 @@ Tested so far (beta preparation):
 
 | | Tested |
 |---|---|
-| macOS | 27.2.1 |
+| macOS | 27.2.1 on a Mac; 14.8, 15.7 and 26.6 in virtual machines |
 | Mac | Apple Silicon (M1) |
 | Displays | Built-in Retina + external 2560×1440, arranged above and side by side; plugging and unplugging |
-| Apps | TextEdit, Safari, Google Chrome, Visual Studio Code, Terminal |
+| Apps | TextEdit, Safari, Google Chrome, Visual Studio Code, Terminal (TextEdit on every macOS version above) |
 
-**Not tested yet:** macOS 14, 15 and 26, and Intel Macs. The app is built for them, but
-please report what you find.
+**Not tested yet:** Intel Macs. The app is built for them, so please report what you find.
 
 ## Privacy
 
