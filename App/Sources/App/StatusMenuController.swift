@@ -10,6 +10,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let shortcuts: ShortcutController
     private let monitor: AccessibilityMonitor
     private let showWelcome: () -> Void
+    private let showSettings: () -> Void
     #if DEBUG
     private lazy var fixture = FixtureWindowController()
     #endif
@@ -26,11 +27,12 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     ]
 
     init(runner: WindowActionRunner, shortcuts: ShortcutController, monitor: AccessibilityMonitor,
-         showWelcome: @escaping () -> Void) {
+         showWelcome: @escaping () -> Void, showSettings: @escaping () -> Void) {
         self.runner = runner
         self.shortcuts = shortcuts
         self.monitor = monitor
         self.showWelcome = showWelcome
+        self.showSettings = showSettings
         super.init()
 
         if let button = statusItem.button {
@@ -71,9 +73,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
 
         menu.addItem(.separator())
-        let shortcutsItem = NSMenuItem(title: "Shortcuts", action: nil, keyEquivalent: "")
-        shortcutsItem.submenu = shortcutsMenu()
-        menu.addItem(shortcutsItem)
+        let settingsItem = item("Settings…", #selector(openSettings))
+        settingsItem.keyEquivalent = ","
+        menu.addItem(settingsItem)
         if !shortcuts.failures.isEmpty {
             menu.addItem(info("⚠︎ \(shortcuts.failures.count) shortcut(s) in use by another app"))
         }
@@ -91,41 +93,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Zuntrio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-    }
-
-    // MARK: - Shortcuts submenu
-
-    /// Temporary home for shortcut settings until the settings window exists.
-    private func shortcutsMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-
-        menu.addItem(info("Preset"))
-        for preset in ShortcutPreset.allCases {
-            let presetItem = item(preset.displayName, #selector(selectPreset(_:)))
-            presetItem.representedObject = preset.rawValue
-            presetItem.state = shortcuts.settings.preset == preset ? .on : .off
-            presetItem.indentationLevel = 1
-            menu.addItem(presetItem)
-        }
-
-        menu.addItem(.separator())
-        menu.addItem(info("Enabled shortcuts (click to turn on/off)"))
-        for section in Self.sections {
-            for action in section {
-                let toggle = actionItem(action, title: action.displayName, selector: #selector(toggleShortcut(_:)))
-                toggle.state = shortcuts.settings.isEnabled(action) ? .on : .off
-                toggle.indentationLevel = 1
-                menu.addItem(toggle)
-            }
-        }
-
-        menu.addItem(.separator())
-        menu.addItem(item("Restore Default Shortcuts", #selector(restoreDefaults)))
-        if shortcuts.isReadOnly {
-            menu.addItem(info("Settings were saved by a newer Zuntrio; changes won't be saved"))
-        }
-        return menu
     }
 
     // MARK: - Items
@@ -182,14 +149,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         runner.perform(action)
     }
 
-    @objc private func selectPreset(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let preset = ShortcutPreset(rawValue: raw) else { return }
-        shortcuts.select(preset)
-    }
-
-    @objc private func toggleShortcut(_ sender: NSMenuItem) {
-        guard let action = action(of: sender) else { return }
-        shortcuts.setEnabled(!shortcuts.settings.isEnabled(action), for: action)
+    @objc private func openSettings() {
+        showSettings()
     }
 
     @objc private func openWelcome() {
@@ -199,10 +160,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     @objc private func showAbout() {
         NSApp.activate()
         NSApp.orderFrontStandardAboutPanel(nil)
-    }
-
-    @objc private func restoreDefaults() {
-        shortcuts.restoreDefaults()
     }
 
     #if DEBUG

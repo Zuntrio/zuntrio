@@ -5,8 +5,7 @@ keyboard shortcuts. It is inspired by [Spectacle](https://github.com/eczarny/spe
 is no longer maintained, and keeps the same keyboard-first workflow.
 
 > **Status: early development.** All Spectacle window actions, including undo/redo, work with
-> their default shortcuts. A settings window and multi-display testing are still in progress.
-> No release has been published.
+> configurable shortcuts. Multi-display testing is still in progress. No release has been published.
 
 ## Requirements
 
@@ -21,6 +20,10 @@ Zuntrio needs **Accessibility** access to move and resize other apps' windows. C
 **System Settings → Privacy & Security → Accessibility** and turn on Zuntrio.
 
 Zuntrio uses this access only to read and set the position and size of the focused window.
+
+## Launch at login
+
+Turn on **Launch Zuntrio at login** in Settings. It is off by default.
 
 ## Privacy
 
@@ -50,10 +53,12 @@ The defaults match Spectacle's, so former Spectacle users can keep their muscle 
 - Next/Previous Third steps through three columns, then three rows.
 - Moving to another display keeps the window's relative position and size.
 - Undo/Redo is kept separately for each window, up to 50 steps. It is cleared when Zuntrio quits.
-- The **Shortcuts** submenu lets you turn individual shortcuts on or off, restore the defaults,
-  or switch to the **Alternative (⌃⌥)** preset. That preset leaves ⌥⌘←/→ free, which most
-  browsers use to switch tabs.
-- Choosing your own key combinations comes with the settings window.
+- In **Settings…** (in the Zuntrio menu) you can:
+  - record your own shortcut for any action (Esc cancels, ⌫ clears);
+  - turn individual shortcuts on or off;
+  - restore the defaults;
+  - switch to the **Alternative (⌃⌥)** preset, which leaves ⌥⌘←/→ free for browsers' tab switching.
+- Every shortcut must include ⌘ or ⌃.
 - Zuntrio warns when a shortcut is already taken by another app or may clash with a macOS
   keyboard shortcut.
 

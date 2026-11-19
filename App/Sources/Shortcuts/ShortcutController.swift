@@ -55,6 +55,23 @@ final class ShortcutController {
         update { $0.restoreDefaults() }
     }
 
+    /// Assigns a recorded combination. Returns why it was refused, if it was.
+    func assign(_ combo: KeyCombo, to action: WindowAction) -> ShortcutIssue? {
+        var issue: ShortcutIssue?
+        update { issue = $0.assign(combo, to: action) }
+        return issue
+    }
+
+    /// Releases all global hotkeys while the user records a new shortcut, so
+    /// pressing an existing Zuntrio shortcut records it instead of running it.
+    func suspend() {
+        hotKeys.unregisterAll()
+    }
+
+    func resume() {
+        apply()
+    }
+
     /// Unregisters everything and registers the current bindings again.
     func apply() {
         hotKeys.unregisterAll()

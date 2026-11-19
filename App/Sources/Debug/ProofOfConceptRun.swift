@@ -83,6 +83,35 @@ enum ProofOfConceptRun {
         NSApp.terminate(nil)
     }
 
+    /// `--poc-render-settings <directory>` captures the real settings window
+    /// (AppKit controls included) off screen, idle and while recording, then quits.
+    static func renderSettingsIfRequested(arguments: [String], settings: SettingsWindowController) {
+        guard let directory = value(after: "--poc-render-settings", in: arguments) else { return }
+        let window = settings.makeWindow()
+        window.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        window.orderFront(nil)
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(500))
+            capture(window, to: directory, name: "settings.png")
+            settings.model.toggleRecording(.leftHalf)
+            try? await Task.sleep(for: .milliseconds(300))
+            capture(window, to: directory, name: "settings-recording.png")
+            settings.model.stopRecording()
+            NSApp.terminate(nil)
+        }
+    }
+
+    private static func capture(_ window: NSWindow, to directory: String, name: String) {
+        guard let view = window.contentView,
+              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        do {
+            try rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: directory).appendingPathComponent(name))
+        } catch {
+            Log.actions.error("Capturing settings failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     static func startIfRequested(arguments: [String], runner defaultRunner: WindowActionRunner) {
         if arguments.contains("--poc-fixture-host") {
             let controller = FixtureWindowController()

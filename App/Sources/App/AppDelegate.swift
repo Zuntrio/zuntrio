@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var shortcuts: ShortcutController?
     private var statusMenu: StatusMenuController?
     private var onboarding: OnboardingWindowController?
+    private var settings: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let shortcuts = ShortcutController(hotKeys: hotKeys) { [weak self] action in
@@ -19,14 +20,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let onboarding = OnboardingWindowController(monitor: monitor, shortcuts: shortcuts)
         self.onboarding = onboarding
-        let statusMenu = StatusMenuController(runner: runner, shortcuts: shortcuts, monitor: monitor) {
-            onboarding.show()
-        }
+        let settings = SettingsWindowController(model: SettingsModel(shortcuts: shortcuts, monitor: monitor))
+        self.settings = settings
+        let statusMenu = StatusMenuController(
+            runner: runner, shortcuts: shortcuts, monitor: monitor,
+            showWelcome: { onboarding.show() }, showSettings: { settings.show() }
+        )
         self.statusMenu = statusMenu
 
         monitor.onChange = { [weak self] trusted in
             self?.onboarding?.trustChanged(trusted)
             self?.statusMenu?.trustChanged(trusted)
+            self?.settings?.model.reload()
             if trusted { self?.monitor.setPolling(false) }
         }
         // A shortcut pressed without permission opens the explanation rather
@@ -52,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         ProofOfConceptRun.writeShortcutReportIfRequested(arguments: CommandLine.arguments, shortcuts: shortcuts)
         ProofOfConceptRun.renderOnboardingIfRequested(arguments: CommandLine.arguments, shortcuts: shortcuts)
+        ProofOfConceptRun.renderSettingsIfRequested(arguments: CommandLine.arguments, settings: settings)
         ProofOfConceptRun.startIfRequested(arguments: CommandLine.arguments, runner: runner)
         #endif
     }
