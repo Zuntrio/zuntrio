@@ -1,0 +1,59 @@
+name: Zuntrio
+options:
+  bundleIdPrefix: app.zuntrio
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+packages:
+  ZuntrioCore:
+    path: ZuntrioCore
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+targets:
+  Zuntrio:
+    type: application
+    platform: macOS
+    sources:
+      - App/Sources
+    dependencies:
+      - package: ZuntrioCore
+    settings:
+      base:
+        PRODUCT_NAME: Zuntrio
+        PRODUCT_BUNDLE_IDENTIFIER: app.zuntrio.Zuntrio
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Zuntrio
+        INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        # Accessibility access requires a non-sandboxed app.
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: YES
+        # Ad-hoc signing for local builds. Note: macOS ties the Accessibility
+        # grant to the code signature, so ad-hoc rebuilds may need re-granting.
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+        # Universal binary (ADR: minimum macOS 14, arm64 + x86_64).
+        ARCHS: "arm64 x86_64"
+        SWIFT_STRICT_CONCURRENCY: complete
+        # No SwiftUI previews; a separate debug dylib breaks library validation
+        # under the hardened runtime when signing with a local identity.
+        ENABLE_DEBUG_DYLIB: NO
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+      configs:
+        Debug:
+          ONLY_ACTIVE_ARCH: YES
+        Release:
+          ONLY_ACTIVE_ARCH: NO
+schemes:
+  Zuntrio:
+    build:
+      targets:
+        Zuntrio: all
+    test:
+      targets:
+        - package: ZuntrioCore/ZuntrioCoreTests
