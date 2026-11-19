@@ -44,6 +44,23 @@ public enum DisplaySelection {
         }
     }
 
+    /// Makes a remembered frame usable on the current displays. A frame that
+    /// still overlaps any display is returned unchanged (users may keep windows
+    /// partly off screen on purpose). One whose display is gone is moved onto
+    /// the nearest display's visible area, shrunk to fit if needed.
+    public static func fitted(_ rect: CGRect, in displays: [DisplayGeometry]) -> CGRect {
+        if displays.contains(where: { !$0.frame.intersection(rect).isNull && !$0.frame.intersection(rect).isEmpty }) {
+            return rect
+        }
+        guard let index = displayIndex(for: rect, in: displays) else { return rect }
+        let area = displays[index].visibleFrame
+        let width = min(rect.width, area.width)
+        let height = min(rect.height, area.height)
+        let x = min(max(rect.minX, area.minX), area.maxX - width)
+        let y = min(max(rect.minY, area.minY), area.maxY - height)
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+
     private static func squaredDistance(_ point: CGPoint, _ rect: CGRect) -> CGFloat {
         let dx = point.x - rect.midX
         let dy = point.y - rect.midY

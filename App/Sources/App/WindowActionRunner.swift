@@ -17,7 +17,7 @@ struct ActionReport: Sendable, Equatable {
         case failed(WindowAccessError)
     }
 
-    let action: LayoutAction
+    let action: WindowAction
     let result: Result
     var before: CGRect?
     var requested: CGRect?
@@ -34,7 +34,11 @@ struct ActionReport: Sendable, Equatable {
         case .alreadyInPlace:
             "\(action.displayName): already in place"
         case .nothingToDo:
-            "\(action.displayName): nothing to do"
+            switch action {
+            case .undo: "Nothing to undo for this window"
+            case .redo: "Nothing to redo for this window"
+            default: "\(action.displayName): nothing to do"
+            }
         case .failed(let error):
             "\(action.displayName): \(error.description)"
         }
@@ -63,13 +67,15 @@ final class WindowActionRunner {
     /// Last action applied, for cycling. Only one window is remembered:
     /// cycling needs consecutive presses on the same window.
     private var memory: (window: AnyHashable, layout: LayoutMemory)?
+    /// Undo/redo history per window (in memory only, never persisted).
+    private var history = WindowHistory<AnyHashable>()
 
     init(provider: any WindowProviding) {
         self.provider = provider
     }
 
     @discardableResult
-    func perform(_ action: LayoutAction) -> ActionReport {
+    func perform(_ action: WindowAction) -> ActionReport {
         let report = run(action)
         lastReport = report
         log(report)
@@ -78,10 +84,13 @@ final class WindowActionRunner {
         return report
     }
 
-    private func run(_ action: LayoutAction) -> ActionReport {
+    private func run(_ action: WindowAction) -> ActionReport {
         do throws(WindowAccessError) {
             let window = try provider.focusedWindow()
             let before = try window.frame()
+            if action.isHistory {
+                return try runHistory(action, window: window, before: before)
+            }
 
             let displays = DisplayProvider.current()
             guard let source = DisplaySelection.displayIndex(for: before, in: displays) else {
@@ -112,16 +121,51 @@ final class WindowActionRunner {
                 action: action, cycleIndex: layout.cycleIndex, requestedFrame: target, resultingFrame: actual
             ))
 
-            let result: ActionReport.Result = switch FrameVerification.outcome(
-                before: before, requested: target, actual: actual
-            ) {
-            case .exact: .exact
-            case .clamped: .clamped
-            case .ignored: .ignored
+            let result = Self.result(before: before, requested: target, actual: actual)
+            if result == .exact || result == .clamped {
+                history.record(.init(before: before, after: actual), for: window.identity)
             }
             return ActionReport(action: action, result: result, before: before, requested: target, actual: actual)
         } catch {
             return ActionReport(action: action, result: .failed(error))
+        }
+    }
+
+    /// Undo restores the frame from before the window's last Zuntrio action;
+    /// redo re-applies it. The history entry only moves once the frame was
+    /// actually set, so a failed restore can be retried.
+    private func runHistory(
+        _ action: WindowAction, window: any ManagedWindow, before: CGRect
+    ) throws(WindowAccessError) -> ActionReport {
+        let key = window.identity
+        let isUndo = action == .undo
+        guard let entry = isUndo ? history.nextUndo(for: key) : history.nextRedo(for: key) else {
+            return ActionReport(action: action, result: .nothingToDo, before: before)
+        }
+        // The display the frame was on may have been disconnected since.
+        let target = DisplaySelection.fitted(isUndo ? entry.before : entry.after, in: DisplayProvider.current())
+        let commit = { [self] in
+            if isUndo { history.didUndo(for: key) } else { history.didRedo(for: key) }
+            memory = nil // the window left its layout cycle
+        }
+
+        if LayoutEngine.approximatelyEqual(target, before, tolerance: 1) {
+            commit()
+            return ActionReport(action: action, result: .alreadyInPlace, before: before, requested: target, actual: before)
+        }
+        let actual = try window.setFrame(target)
+        commit()
+        return ActionReport(
+            action: action, result: Self.result(before: before, requested: target, actual: actual),
+            before: before, requested: target, actual: actual
+        )
+    }
+
+    private static func result(before: CGRect, requested: CGRect, actual: CGRect) -> ActionReport.Result {
+        switch FrameVerification.outcome(before: before, requested: requested, actual: actual) {
+        case .exact: .exact
+        case .clamped: .clamped
+        case .ignored: .ignored
         }
     }
 

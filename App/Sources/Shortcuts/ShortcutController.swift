@@ -9,18 +9,18 @@ final class ShortcutController {
 
     private let hotKeys: HotKeyCenter
     private let defaults: UserDefaults
-    private let perform: (LayoutAction) -> Void
+    private let perform: (WindowAction) -> Void
 
     private(set) var settings: ShortcutSettings
     /// True when the stored settings came from a newer Zuntrio: we run on
     /// defaults but never overwrite that data.
     private(set) var isReadOnly = false
     /// Actions whose hotkey could not be registered, with the reason.
-    private(set) var failures: [LayoutAction: String] = [:]
+    private(set) var failures: [WindowAction: String] = [:]
     /// Actions whose shortcut matches an enabled macOS shortcut.
-    private(set) var systemConflicts: Set<LayoutAction> = []
+    private(set) var systemConflicts: Set<WindowAction> = []
 
-    init(hotKeys: HotKeyCenter, defaults: UserDefaults = .standard, perform: @escaping (LayoutAction) -> Void) {
+    init(hotKeys: HotKeyCenter, defaults: UserDefaults = .standard, perform: @escaping (WindowAction) -> Void) {
         self.hotKeys = hotKeys
         self.defaults = defaults
         self.perform = perform
@@ -39,7 +39,7 @@ final class ShortcutController {
         }
     }
 
-    func combo(for action: LayoutAction) -> KeyCombo? {
+    func combo(for action: WindowAction) -> KeyCombo? {
         settings.combo(for: action)
     }
 
@@ -47,7 +47,7 @@ final class ShortcutController {
         update { $0.select(preset) }
     }
 
-    func setEnabled(_ enabled: Bool, for action: LayoutAction) {
+    func setEnabled(_ enabled: Bool, for action: WindowAction) {
         update { $0.setEnabled(enabled, for: action) }
     }
 

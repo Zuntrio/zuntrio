@@ -4,8 +4,8 @@ Zuntrio is a free, open-source window manager for macOS. You move and resize win
 keyboard shortcuts. It is inspired by [Spectacle](https://github.com/eczarny/spectacle), which
 is no longer maintained, and keeps the same keyboard-first workflow.
 
-> **Status: early development.** All Spectacle window actions work with their default
-> shortcuts. Undo/redo, shortcut settings and multi-display testing are still in progress.
+> **Status: early development.** All Spectacle window actions, including undo/redo, work with
+> their default shortcuts. A settings window and multi-display testing are still in progress.
 > No release has been published.
 
 ## Requirements
@@ -49,7 +49,7 @@ The defaults match Spectacle's, so former Spectacle users can keep their muscle 
 - Pressing a half or corner shortcut repeatedly cycles the size ½ → ⅔ → ⅓.
 - Next/Previous Third steps through three columns, then three rows.
 - Moving to another display keeps the window's relative position and size.
-- Undo/Redo is not implemented yet.
+- Undo/Redo is kept separately for each window, up to 50 steps. It is cleared when Zuntrio quits.
 - The **Shortcuts** submenu lets you turn individual shortcuts on or off, restore the defaults,
   or switch to the **Alternative (⌃⌥)** preset. That preset leaves ⌥⌘←/→ free, which most
   browsers use to switch tabs.
@@ -67,6 +67,7 @@ Alternative preset:
 | Next / Previous third | ⌃⌥⇧→ / ⌃⌥⇧← |
 | Larger / Smaller | ⌃⌥= / ⌃⌥- |
 | Next / Previous display | ⌃⌥⌘→ / ⌃⌥⌘← |
+| Undo / Redo | ⌃⌥Z / ⌃⌥⇧Z |
 
 ## Building from source
 

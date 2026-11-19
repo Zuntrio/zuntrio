@@ -11,7 +11,7 @@ let leftDisplay = CGRect(x: -1920, y: -155, width: 1920, height: 1055)
 /// A floating window in the middle of the laptop screen.
 let floating = CGRect(x: 300, y: 200, width: 800, height: 600)
 
-func target(_ action: LayoutAction, _ window: CGRect, on screen: CGRect = laptop, memory: LayoutMemory? = nil) -> CGRect? {
+func target(_ action: WindowAction, _ window: CGRect, on screen: CGRect = laptop, memory: LayoutMemory? = nil) -> CGRect? {
     LayoutEngine.targetFrame(for: action, window: window, visibleFrame: screen, memory: memory)
 }
 
@@ -61,7 +61,7 @@ func target(_ action: LayoutAction, _ window: CGRect, on screen: CGRect = laptop
     }
 
     /// Repeats an action on its own output, `count` times.
-    func cycle(_ action: LayoutAction, _ count: Int, on screen: CGRect = laptop) -> [CGRect] {
+    func cycle(_ action: WindowAction, _ count: Int, on screen: CGRect = laptop) -> [CGRect] {
         var frame = floating
         return (0..<count).compactMap { _ in
             guard let next = target(action, frame, on: screen) else { return nil }
@@ -253,7 +253,7 @@ func target(_ action: LayoutAction, _ window: CGRect, on screen: CGRect = laptop
     @Test func nextAndPreviousFollowSpatialOrderAndWrap() throws {
         // Deliberately unsorted input: external, primary, left.
         let displays = [external, primary, left]
-        func next(_ from: Int, _ action: LayoutAction = .nextDisplay) -> Int? {
+        func next(_ from: Int, _ action: WindowAction = .nextDisplay) -> Int? {
             LayoutEngine.layout(action, window: displays[from].visibleFrame, displays: displays, sourceDisplayIndex: from)?.displayIndex
         }
         #expect(next(2) == 1) // left → primary

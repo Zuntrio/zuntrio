@@ -1,8 +1,8 @@
 import CoreGraphics
 
-/// Window actions computed by the layout engine (Spectacle parity set).
-/// Undo/redo are history operations, not layouts, and live elsewhere.
-public enum LayoutAction: String, Sendable, CaseIterable {
+/// Every user-facing window action (Spectacle parity set). All but undo/redo
+/// are computed by `LayoutEngine`; undo/redo are served by `WindowHistory`.
+public enum WindowAction: String, Sendable, CaseIterable {
     case center
     case maximize
     case leftHalf, rightHalf, topHalf, bottomHalf
@@ -10,6 +10,7 @@ public enum LayoutAction: String, Sendable, CaseIterable {
     case nextThird, previousThird
     case larger, smaller
     case nextDisplay, previousDisplay
+    case undo, redo
 
     public var displayName: String {
         switch self {
@@ -29,8 +30,13 @@ public enum LayoutAction: String, Sendable, CaseIterable {
         case .smaller: "Make Smaller"
         case .nextDisplay: "Next Display"
         case .previousDisplay: "Previous Display"
+        case .undo: "Undo"
+        case .redo: "Redo"
         }
     }
+
+    /// Undo/redo restore remembered frames instead of computing a layout.
+    public var isHistory: Bool { self == .undo || self == .redo }
 
     var isThird: Bool { self == .nextThird || self == .previousThird }
 }
@@ -39,12 +45,12 @@ public enum LayoutAction: String, Sendable, CaseIterable {
 /// repeated presses keep cycling even when the app adjusted the frame (e.g.
 /// Terminal snapping to its character grid, or a maximum window size).
 public struct LayoutMemory: Sendable, Equatable {
-    public var action: LayoutAction
+    public var action: WindowAction
     public var cycleIndex: Int
     public var requestedFrame: CGRect
     public var resultingFrame: CGRect
 
-    public init(action: LayoutAction, cycleIndex: Int, requestedFrame: CGRect, resultingFrame: CGRect) {
+    public init(action: WindowAction, cycleIndex: Int, requestedFrame: CGRect, resultingFrame: CGRect) {
         self.action = action
         self.cycleIndex = cycleIndex
         self.requestedFrame = requestedFrame
@@ -84,7 +90,7 @@ public enum LayoutEngine {
     ///   - sourceDisplayIndex: the display the window is on (see `DisplaySelection`).
     ///   - memory: the last action applied to this same window, if any.
     public static func layout(
-        _ action: LayoutAction,
+        _ action: WindowAction,
         window: CGRect,
         displays: [DisplayGeometry],
         sourceDisplayIndex: Int,
@@ -132,12 +138,15 @@ public enum LayoutEngine {
             let target = order[(position + offset) % order.count]
             let frame = moved(window, from: screen, to: displays[target].visibleFrame.standardized)
             return LayoutResult(frame: frame, displayIndex: target, cycleIndex: 0)
+
+        case .undo, .redo:
+            return nil // handled by WindowHistory
         }
     }
 
     /// Single-display convenience used by tests and simple callers.
     public static func targetFrame(
-        for action: LayoutAction, window: CGRect, visibleFrame: CGRect, memory: LayoutMemory? = nil
+        for action: WindowAction, window: CGRect, visibleFrame: CGRect, memory: LayoutMemory? = nil
     ) -> CGRect? {
         let display = DisplayGeometry(id: 0, frame: visibleFrame, visibleFrame: visibleFrame)
         return layout(action, window: window, displays: [display], sourceDisplayIndex: 0, memory: memory)?.frame
@@ -149,7 +158,7 @@ public enum LayoutEngine {
     /// the same cycle and the window hasn't moved since; otherwise fall back to
     /// matching the window's geometry against the candidates.
     static func currentIndex(
-        in candidates: [CGRect], window: CGRect, memory: LayoutMemory?, sameCycle: (LayoutAction) -> Bool
+        in candidates: [CGRect], window: CGRect, memory: LayoutMemory?, sameCycle: (WindowAction) -> Bool
     ) -> Int? {
         if let memory, sameCycle(memory.action), candidates.indices.contains(memory.cycleIndex),
            approximatelyEqual(memory.resultingFrame, window) {
@@ -160,7 +169,7 @@ public enum LayoutEngine {
 
     // MARK: - Geometry
 
-    static func fractionRect(_ action: LayoutAction, fraction: CGFloat, in s: CGRect) -> CGRect {
+    static func fractionRect(_ action: WindowAction, fraction: CGFloat, in s: CGRect) -> CGRect {
         let width = (s.width * fraction).rounded(.down)
         let height = (s.height * fraction).rounded(.down)
         let halfHeight = (s.height / 2).rounded(.down)

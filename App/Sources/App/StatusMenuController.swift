@@ -15,13 +15,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     #endif
 
     /// Menu sections, in Spectacle's order.
-    private static let sections: [[LayoutAction]] = [
+    private static let sections: [[WindowAction]] = [
         [.center, .maximize],
         [.leftHalf, .rightHalf, .topHalf, .bottomHalf],
         [.upperLeft, .upperRight, .lowerLeft, .lowerRight],
         [.nextThird, .previousThird],
         [.larger, .smaller],
         [.nextDisplay, .previousDisplay],
+        [.undo, .redo],
     ]
 
     init(runner: WindowActionRunner, shortcuts: ShortcutController, monitor: AccessibilityMonitor,
@@ -132,7 +133,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     /// An action item with its global shortcut (and any problem) in a
     /// right-aligned column. Shortcuts are shown as text, not key equivalents:
     /// key equivalents would only fire while the menu is open.
-    private func actionItem(_ action: LayoutAction, title: String, selector: Selector) -> NSMenuItem {
+    private func actionItem(_ action: WindowAction, title: String, selector: Selector) -> NSMenuItem {
         var detail = shortcuts.combo(for: action)?.displayString ?? "—"
         if shortcuts.failures[action] != nil {
             detail += "  ⚠︎ in use by another app"
@@ -162,8 +163,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         return menuItem
     }
 
-    private func action(of sender: NSMenuItem) -> LayoutAction? {
-        (sender.representedObject as? String).flatMap(LayoutAction.init(rawValue:))
+    private func action(of sender: NSMenuItem) -> WindowAction? {
+        (sender.representedObject as? String).flatMap(WindowAction.init(rawValue:))
     }
 
     // MARK: - Handlers

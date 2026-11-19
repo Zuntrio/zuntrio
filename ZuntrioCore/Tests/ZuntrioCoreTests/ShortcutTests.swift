@@ -5,7 +5,7 @@ import Testing
     let map = DefaultShortcuts.spectacle
 
     @Test func everyActionHasADefault() {
-        #expect(Set(map.keys) == Set(LayoutAction.allCases))
+        #expect(Set(map.keys) == Set(WindowAction.allCases))
     }
 
     @Test func defaultsAreUnique() {

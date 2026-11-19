@@ -34,8 +34,8 @@ enum ProofOfConceptRun {
             let parts = op.split(separator: ":").map(String.init)
             switch (parts.first, parts.count > 1 ? parts[1] : nil) {
             case ("preset", let name?): ShortcutPreset(rawValue: name).map(shortcuts.select)
-            case ("disable", let name?): LayoutAction(rawValue: name).map { shortcuts.setEnabled(false, for: $0) }
-            case ("enable", let name?): LayoutAction(rawValue: name).map { shortcuts.setEnabled(true, for: $0) }
+            case ("disable", let name?): WindowAction(rawValue: name).map { shortcuts.setEnabled(false, for: $0) }
+            case ("enable", let name?): WindowAction(rawValue: name).map { shortcuts.setEnabled(true, for: $0) }
             case ("restore", _): shortcuts.restoreDefaults()
             default: break
             }
@@ -48,7 +48,7 @@ enum ProofOfConceptRun {
         }
         write([
             "activePreset": shortcuts.settings.preset.rawValue,
-            "disabled": LayoutAction.allCases.filter { !shortcuts.settings.isEnabled($0) }.map(\.rawValue),
+            "disabled": WindowAction.allCases.filter { !shortcuts.settings.isEnabled($0) }.map(\.rawValue),
             "registered": shortcuts.settings.effectiveBindings.count - shortcuts.failures.count,
             "failures": shortcuts.failures.map { "\($0.key.rawValue): \($0.value)" },
             "systemConflictsActive": shortcuts.systemConflicts.map(\.rawValue).sorted(),
@@ -62,7 +62,7 @@ enum ProofOfConceptRun {
     /// permission states to PNG (for layout review), then quits.
     static func renderOnboardingIfRequested(arguments: [String], shortcuts: ShortcutController) {
         guard let directory = value(after: "--poc-render-onboarding", in: arguments) else { return }
-        let examples: [LayoutAction] = [.leftHalf, .rightHalf, .maximize, .center, .nextDisplay]
+        let examples: [WindowAction] = [.leftHalf, .rightHalf, .maximize, .center, .nextDisplay]
         for trusted in [false, true] {
             let model = OnboardingModel(
                 isTrusted: trusted,
@@ -92,7 +92,7 @@ enum ProofOfConceptRun {
         }
         guard let actionsArgument = value(after: "--poc-run", in: arguments),
               let output = value(after: "--poc-output", in: arguments) else { return }
-        let actions = actionsArgument.split(separator: ",").compactMap { LayoutAction(rawValue: String($0)) }
+        let actions = actionsArgument.split(separator: ",").compactMap { WindowAction(rawValue: String($0)) }
         let targetPID = value(after: "--poc-target-pid", in: arguments).flatMap { pid_t($0) }
         // Never fall back to the frontmost window when a specific target was
         // asked for but can't be parsed: that would move the user's windows.

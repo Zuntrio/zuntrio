@@ -6,7 +6,7 @@ import Testing
     @Test(arguments: ShortcutPreset.allCases)
     func presetCoversEveryActionUniquelyAndValidly(preset: ShortcutPreset) {
         let map = preset.bindings
-        #expect(Set(map.keys) == Set(LayoutAction.allCases))
+        #expect(Set(map.keys) == Set(WindowAction.allCases))
         #expect(Set(map.values).count == map.count)
         #expect(map.values.allSatisfy { $0.validationIssue == nil })
     }
@@ -47,7 +47,7 @@ import Testing
         var settings = ShortcutSettings()
         settings.setEnabled(false, for: .center)
         #expect(!settings.isEnabled(.center))
-        #expect(settings.effectiveBindings.count == LayoutAction.allCases.count - 1)
+        #expect(settings.effectiveBindings.count == WindowAction.allCases.count - 1)
         settings.setEnabled(true, for: .center)
         #expect(settings.combo(for: .center) == DefaultShortcuts.spectacle[.center])
         #expect(settings.overrides.isEmpty)

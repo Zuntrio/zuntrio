@@ -77,7 +77,7 @@ public struct KeyCombo: Sendable, Hashable, Codable {
 public enum ShortcutIssue: Sendable, Equatable {
     case needsCommandOrControl
     /// Already used by another Zuntrio action.
-    case usedByAction(LayoutAction)
+    case usedByAction(WindowAction)
     /// Matches an enabled macOS keyboard shortcut (System Settings → Keyboard → Keyboard Shortcuts).
     case reservedBySystem
 }
@@ -96,7 +96,7 @@ public enum ShortcutPreset: String, Sendable, CaseIterable, Codable {
         }
     }
 
-    public var bindings: [LayoutAction: KeyCombo] {
+    public var bindings: [WindowAction: KeyCombo] {
         switch self {
         case .spectacle: DefaultShortcuts.spectacle
         case .alternative: DefaultShortcuts.alternative
@@ -106,7 +106,7 @@ public enum ShortcutPreset: String, Sendable, CaseIterable, Codable {
 
 /// Default shortcut maps. Every combination includes ⌘ or ⌃.
 public enum DefaultShortcuts {
-    public static let spectacle: [LayoutAction: KeyCombo] = {
+    public static let spectacle: [WindowAction: KeyCombo] = {
         typealias K = KeyCombo.Key
         let cmdOpt: ShortcutModifiers = [.command, .option]
         let ctrlCmd: ShortcutModifiers = [.control, .command]
@@ -115,6 +115,8 @@ public enum DefaultShortcuts {
         let ctrlOptShift: ShortcutModifiers = [.control, .option, .shift]
         let ctrlOptCmd: ShortcutModifiers = [.control, .option, .command]
         return [
+            .undo: KeyCombo(keyCode: K.z, modifiers: cmdOpt),
+            .redo: KeyCombo(keyCode: K.z, modifiers: [.option, .shift, .command]),
             .center: KeyCombo(keyCode: K.c, modifiers: cmdOpt),
             .maximize: KeyCombo(keyCode: K.f, modifiers: cmdOpt),
             .leftHalf: KeyCombo(keyCode: K.leftArrow, modifiers: cmdOpt),
@@ -136,12 +138,14 @@ public enum DefaultShortcuts {
 
     /// Alternative preset: ⌃⌥ + arrows for halves, ⌃⌥ + U/I/J/K for corners
     /// (laid out like the corners of the screen), so ⌥⌘ stays free for apps.
-    public static let alternative: [LayoutAction: KeyCombo] = {
+    public static let alternative: [WindowAction: KeyCombo] = {
         typealias K = KeyCombo.Key
         let ctrlOpt: ShortcutModifiers = [.control, .option]
         let ctrlOptShift: ShortcutModifiers = [.control, .option, .shift]
         let ctrlOptCmd: ShortcutModifiers = [.control, .option, .command]
         return [
+            .undo: KeyCombo(keyCode: K.z, modifiers: ctrlOpt),
+            .redo: KeyCombo(keyCode: K.z, modifiers: ctrlOptShift),
             .center: KeyCombo(keyCode: K.c, modifiers: ctrlOpt),
             .maximize: KeyCombo(keyCode: K.returnKey, modifiers: ctrlOpt),
             .leftHalf: KeyCombo(keyCode: K.leftArrow, modifiers: ctrlOpt),

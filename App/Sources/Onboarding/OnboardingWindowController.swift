@@ -17,7 +17,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     init(monitor: AccessibilityMonitor, shortcuts: ShortcutController, defaults: UserDefaults = .standard) {
         self.monitor = monitor
         self.defaults = defaults
-        let examples: [LayoutAction] = [.leftHalf, .rightHalf, .maximize, .center, .nextDisplay]
+        let examples: [WindowAction] = [.leftHalf, .rightHalf, .maximize, .center, .nextDisplay]
         model = OnboardingModel(
             isTrusted: monitor.isTrusted,
             examples: examples.map { ($0.displayName, shortcuts.combo(for: $0)?.displayString ?? "—") }

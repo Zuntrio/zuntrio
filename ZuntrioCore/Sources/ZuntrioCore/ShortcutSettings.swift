@@ -10,9 +10,9 @@ public struct ShortcutSettings: Sendable, Equatable {
 
     public var preset: ShortcutPreset
     /// Actions whose shortcut differs from the preset. Missing = use the preset.
-    public var overrides: [LayoutAction: Binding]
+    public var overrides: [WindowAction: Binding]
 
-    public init(preset: ShortcutPreset = .spectacle, overrides: [LayoutAction: Binding] = [:]) {
+    public init(preset: ShortcutPreset = .spectacle, overrides: [WindowAction: Binding] = [:]) {
         self.preset = preset
         self.overrides = overrides
     }
@@ -20,7 +20,7 @@ public struct ShortcutSettings: Sendable, Equatable {
     public static let `default` = ShortcutSettings()
 
     /// The shortcut each action currently has (disabled actions are absent).
-    public var effectiveBindings: [LayoutAction: KeyCombo] {
+    public var effectiveBindings: [WindowAction: KeyCombo] {
         var result = preset.bindings
         for (action, binding) in overrides {
             switch binding {
@@ -31,11 +31,11 @@ public struct ShortcutSettings: Sendable, Equatable {
         return result
     }
 
-    public func combo(for action: LayoutAction) -> KeyCombo? {
+    public func combo(for action: WindowAction) -> KeyCombo? {
         effectiveBindings[action]
     }
 
-    public func isEnabled(_ action: LayoutAction) -> Bool {
+    public func isEnabled(_ action: WindowAction) -> Bool {
         combo(for: action) != nil
     }
 
@@ -46,7 +46,7 @@ public struct ShortcutSettings: Sendable, Equatable {
         overrides = overrides.filter { $0.value == .disabled }
     }
 
-    public mutating func setEnabled(_ enabled: Bool, for action: LayoutAction) {
+    public mutating func setEnabled(_ enabled: Bool, for action: WindowAction) {
         if enabled {
             if overrides[action] == .disabled { overrides[action] = nil }
             // Re-enabling must not create a duplicate if another action has
@@ -61,7 +61,7 @@ public struct ShortcutSettings: Sendable, Equatable {
 
     /// Assigns a custom shortcut. Fails without changing anything if the
     /// combination is invalid or already used by another action.
-    public mutating func assign(_ combo: KeyCombo, to action: LayoutAction) -> ShortcutIssue? {
+    public mutating func assign(_ combo: KeyCombo, to action: WindowAction) -> ShortcutIssue? {
         if let issue = combo.validationIssue { return issue }
         if let other = conflict(for: combo, assigningTo: action) { return .usedByAction(other) }
         overrides[action] = combo == preset.bindings[action] ? nil : .combo(combo)
@@ -74,12 +74,12 @@ public struct ShortcutSettings: Sendable, Equatable {
     }
 
     /// The other action already using `combo`, if any.
-    public func conflict(for combo: KeyCombo, assigningTo action: LayoutAction) -> LayoutAction? {
+    public func conflict(for combo: KeyCombo, assigningTo action: WindowAction) -> WindowAction? {
         effectiveBindings.first { $0.key != action && $0.value == combo }?.key
     }
 
     /// Actions whose current shortcut matches an enabled macOS shortcut.
-    public func systemConflicts(reserved: Set<KeyCombo>) -> [LayoutAction] {
+    public func systemConflicts(reserved: Set<KeyCombo>) -> [WindowAction] {
         effectiveBindings.filter { reserved.contains($0.value) }.map(\.key)
             .sorted { $0.rawValue < $1.rawValue }
     }
@@ -93,7 +93,7 @@ public struct ShortcutSettings: Sendable, Equatable {
                 overrides[action] = .disabled
             }
         }
-        var owners: [KeyCombo: [LayoutAction]] = [:]
+        var owners: [KeyCombo: [WindowAction]] = [:]
         for (action, combo) in effectiveBindings { owners[combo, default: []].append(action) }
         for actions in owners.values where actions.count > 1 {
             for action in actions {
@@ -110,7 +110,7 @@ public struct ShortcutSettings: Sendable, Equatable {
     private struct Stored: Codable {
         var schemaVersion: Int
         var preset: String
-        /// Keyed by `LayoutAction.rawValue`; a nil combo means disabled.
+        /// Keyed by `WindowAction.rawValue`; a nil combo means disabled.
         var overrides: [String: StoredBinding]
     }
 
@@ -151,7 +151,7 @@ public struct ShortcutSettings: Sendable, Equatable {
 
         var settings = ShortcutSettings(preset: ShortcutPreset(rawValue: stored.preset) ?? .spectacle)
         for (key, binding) in stored.overrides {
-            guard let action = LayoutAction(rawValue: key) else { continue }
+            guard let action = WindowAction(rawValue: key) else { continue }
             settings.overrides[action] = binding.combo.map { .combo($0) } ?? .disabled
         }
         settings.disableInvalidOverrides()
