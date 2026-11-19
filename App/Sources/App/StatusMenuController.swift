@@ -78,9 +78,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menuTargetApp = pause.frontmostOtherApp
 
         // App items first (owner's order).
-        menu.addItem(item("Welcome & Permissions…", #selector(openWelcome)))
-        menu.addItem(item("About Zuntrio", #selector(showAbout)))
-        let settingsItem = item("Settings…", #selector(openSettings))
+        menu.addItem(item("Welcome & Permissions…", #selector(openWelcome), symbol: "checkmark.shield"))
+        menu.addItem(item("About Zuntrio", #selector(showAbout), symbol: "info.circle"))
+        let settingsItem = item("Settings…", #selector(openSettings), symbol: "gearshape")
         settingsItem.keyEquivalent = ","
         menu.addItem(settingsItem)
 
@@ -91,6 +91,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             menu.addItem(item("Turn Shortcuts Back On", #selector(resume)))
         } else {
             let disable = NSMenuItem(title: "Disable Shortcuts", action: nil, keyEquivalent: "")
+            disable.image = Self.symbol("pause.circle")
             disable.submenu = disableMenu()
             menu.addItem(disable)
             if let app = menuTargetApp, pause.settings.isDisabled(bundleID: app.bundleID) {
@@ -127,7 +128,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         #if DEBUG
         menu.addItem(item("Show Test Window", #selector(showFixture)))
         #endif
-        menu.addItem(NSMenuItem(title: "Quit Zuntrio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        let quit = NSMenuItem(title: "Quit Zuntrio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.image = Self.symbol("power")
+        menu.addItem(quit)
     }
 
     /// Shortcuts are global hotkeys; the menu only displays them. Pressing one
@@ -157,6 +160,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private func actionItem(_ action: WindowAction) -> NSMenuItem {
         let menuItem = item(action.displayName, #selector(runAction(_:)))
         menuItem.representedObject = action.rawValue
+        menuItem.image = Self.icon(for: action)
         MenuKeyEquivalent.apply(shortcuts.combo(for: action), to: menuItem)
         if shortcuts.failures[action] != nil {
             menuItem.toolTip = "This shortcut is in use by another app. Change it in Settings."
@@ -166,10 +170,31 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         return menuItem
     }
 
-    private func item(_ title: String, _ selector: Selector) -> NSMenuItem {
+    private func item(_ title: String, _ selector: Selector, symbol: String? = nil) -> NSMenuItem {
         let menuItem = NSMenuItem(title: title, action: selector, keyEquivalent: "")
         menuItem.target = self
+        menuItem.image = symbol.flatMap(Self.symbol)
         return menuItem
+    }
+
+    // MARK: - Icons (owner-approved 2026-11-19)
+
+    /// Zuntrio's own glyph for a window action (Assets: "Menu-<action>"), or an
+    /// SF Symbol for undo/redo. Template images, tinted by the menu.
+    static func icon(for action: WindowAction) -> NSImage? {
+        switch action {
+        case .undo: return symbol("arrow.uturn.backward")
+        case .redo: return symbol("arrow.uturn.forward")
+        default:
+            let image = NSImage(named: "Menu-\(action.rawValue)")
+            image?.isTemplate = true
+            image?.accessibilityDescription = action.displayName
+            return image
+        }
+    }
+
+    static func symbol(_ name: String) -> NSImage? {
+        NSImage(systemSymbolName: name, accessibilityDescription: nil)
     }
 
     private func info(_ title: String) -> NSMenuItem {
