@@ -27,7 +27,7 @@ permissions:
 jobs:
   release:
     if: vars.RELEASE_ENABLED == 'true'
-    runs-on: macos-27
+    runs-on: macos-latest
     timeout-minutes: 60
     env:
       VERSION: ${{ github.event.inputs.version || github.ref_name }}
@@ -37,7 +37,8 @@ jobs:
       - name: Select Xcode 27
         run: |
           XCODE=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$XCODE" ]; then echo "::error::Xcode 27 is not available on this runner image"; exit 1; fi
+          # Required: older Xcode would drop the macOS 27 menu-icon fix.
+          if [ -z "$XCODE" ]; then echo "::error::Xcode 27 is not available on this runner image. Build the release locally (docs: distribution plan) or wait for GitHub's image."; exit 1; fi
           sudo xcode-select -s "$XCODE"
 
       - name: Normalise the version

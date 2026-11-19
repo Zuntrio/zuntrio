@@ -15,19 +15,21 @@ concurrency:
 jobs:
   build-and-test:
     name: Build and test
-    runs-on: macos-27
+    runs-on: macos-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode 27
+      - name: Select the newest Xcode
+        # Prefers Xcode 27. GitHub's images don't have it yet (2026-11), so CI
+        # falls back to the newest Xcode 26; code that needs the macOS 27 SDK
+        # is behind `#if compiler(>=6.4)`. Releases require Xcode 27.
         run: |
-          ls -d /Applications/Xcode*.app
           XCODE=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$XCODE" ]; then echo "::error::Xcode 27 is not available on this runner image"; exit 1; fi
+          [ -z "$XCODE" ] && XCODE=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
           sudo xcode-select -s "$XCODE"
           xcodebuild -version
-          sw_vers
+          sw_vers -productVersion
 
       - name: Install XcodeGen
         run: brew install xcodegen
