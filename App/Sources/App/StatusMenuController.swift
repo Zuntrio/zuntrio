@@ -91,7 +91,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             menu.addItem(item("Turn Shortcuts Back On", #selector(resume)))
         } else {
             let disable = NSMenuItem(title: "Disable Shortcuts", action: nil, keyEquivalent: "")
-            disable.image = Self.symbol("pause.circle")
+            Self.setIcon(Self.symbol("pause.circle"), on: disable)
             disable.submenu = disableMenu()
             menu.addItem(disable)
             if let app = menuTargetApp, pause.settings.isDisabled(bundleID: app.bundleID) {
@@ -129,8 +129,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.addItem(item("Show Test Window", #selector(showFixture)))
         #endif
         let quit = NSMenuItem(title: "Quit Zuntrio", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        quit.image = Self.symbol("power")
+        Self.setIcon(Self.symbol("power"), on: quit)
         menu.addItem(quit)
+
     }
 
     /// Shortcuts are global hotkeys; the menu only displays them. Pressing one
@@ -160,7 +161,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private func actionItem(_ action: WindowAction) -> NSMenuItem {
         let menuItem = item(action.displayName, #selector(runAction(_:)))
         menuItem.representedObject = action.rawValue
-        menuItem.image = Self.icon(for: action)
+        Self.setIcon(Self.icon(for: action), on: menuItem)
         MenuKeyEquivalent.apply(shortcuts.combo(for: action), to: menuItem)
         if shortcuts.failures[action] != nil {
             menuItem.toolTip = "This shortcut is in use by another app. Change it in Settings."
@@ -173,7 +174,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private func item(_ title: String, _ selector: Selector, symbol: String? = nil) -> NSMenuItem {
         let menuItem = NSMenuItem(title: title, action: selector, keyEquivalent: "")
         menuItem.target = self
-        menuItem.image = symbol.flatMap(Self.symbol)
+        Self.setIcon(symbol.flatMap(Self.symbol), on: menuItem)
         return menuItem
     }
 
@@ -190,6 +191,15 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             image?.isTemplate = true
             image?.accessibilityDescription = action.displayName
             return image
+        }
+    }
+
+    /// macOS 27 hides menu item images unless the item asks for them
+    /// (NSMenuItem.preferredImageVisibility); earlier versions always show them.
+    static func setIcon(_ image: NSImage?, on item: NSMenuItem) {
+        item.image = image
+        if #available(macOS 27.0, *), image != nil {
+            item.preferredImageVisibility = .visible
         }
     }
 
