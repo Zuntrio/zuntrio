@@ -14,8 +14,9 @@ muscle memory.
 
 Spectacle made it effortless to arrange windows without reaching for the mouse: a few
 memorable shortcuts, no setup, nothing in the way. Many people still use it every day. But
-its repository is archived, and its last release (2017) predates Apple Silicon, so it runs
-through Rosetta. Apple has announced that general Rosetta support ends after macOS 27.
+its repository is archived, and its last release (2017) predates Apple Silicon, so on today's
+Macs it only runs through Rosetta, which Apple is winding down (see
+[Requirements and support](#requirements-and-support)).
 
 Zuntrio exists so that workflow doesn't disappear. It aims to be:
 
@@ -26,11 +27,26 @@ Zuntrio exists so that workflow doesn't disappear. It aims to be:
 - **trustworthy:** no network access or telemetry, and it tells you honestly when an app
   won't let a window move.
 
-## Requirements
+## Requirements and support
 
-- macOS 14 Sonoma or later
-- Apple Silicon or Intel: one app that runs natively on both. See
-  [Compatibility](#compatibility) for what has been tested.
+- **macOS 14 Sonoma or later.**
+- **Apple Silicon and Intel Macs.** Zuntrio is a Universal app: it contains native code for
+  both, so it never needs Rosetta.
+
+See [Compatibility](#compatibility) for what has been tested.
+
+### Why native support matters: Rosetta is ending
+
+Rosetta is the translation layer that lets apps built only for Intel run on Apple Silicon
+Macs. Apple has announced that Rosetta stays fully available through macOS 27. From macOS 28
+it will be available only for certain older, unmaintained games:
+
+- Apple Support: [Using Intel-based apps on a Mac with Apple silicon](https://support.apple.com/en-us/102527)
+- Apple Developer News: [Upcoming changes to Rosetta support for Intel-based macOS apps](https://developer.apple.com/news/?id=w5ngl9k2)
+
+Spectacle's last release is Intel-only, so on an Apple Silicon Mac it depends on Rosetta.
+Zuntrio gives Spectacle users a native, maintained replacement with the same shortcuts, one
+that keeps working after that change.
 
 ## Install
 
