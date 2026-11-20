@@ -25,3 +25,29 @@ import Testing
         #expect(map[.previousDisplay]?.displayString == "⌃⌥⌘←")
     }
 }
+
+@Suite struct SpokenShortcutTests {
+    @Test func spokenDescriptions() {
+        #expect(KeyCombo(keyCode: KeyCombo.Key.leftArrow, modifiers: [.option, .command]).spokenDescription == "Option Command Left Arrow")
+        #expect(KeyCombo(keyCode: KeyCombo.Key.c, modifiers: [.command, .option]).spokenDescription == "Option Command C")
+        #expect(KeyCombo(keyCode: KeyCombo.Key.rightArrow, modifiers: [.control, .option, .shift, .command]).spokenDescription
+            == "Control Option Shift Command Right Arrow")
+        #expect(KeyCombo(keyCode: KeyCombo.Key.returnKey, modifiers: [.control, .option]).spokenDescription == "Control Option Return")
+        #expect(KeyCombo(keyCode: KeyCombo.Key.equal, modifiers: [.control, .option]).spokenDescription == "Control Option Equals")
+        #expect(KeyCombo(keyCode: KeyCombo.Key.minus, modifiers: [.control, .option]).spokenDescription == "Control Option Minus")
+        #expect(KeyCombo(keyCode: 49, modifiers: [.command]).spokenDescription == "Command Space")
+        #expect(KeyCombo(keyCode: 99, modifiers: [.command]).spokenDescription == "Command Key 99")
+    }
+
+    @Test func everySymbolKeyHasASpokenName() {
+        for (code, name) in KeyCombo.keyNames where !name.allSatisfy({ $0.isLetter || $0.isNumber || $0 == " " }) {
+            #expect(KeyCombo.spokenKeyNames[code] != nil, "No spoken name for \(name)")
+        }
+    }
+
+    @Test func defaultsAreAllSpeakable() {
+        for combo in Array(DefaultShortcuts.spectacle.values) + Array(DefaultShortcuts.alternative.values) {
+            #expect(!combo.spokenDescription.contains(where: { "⌃⌥⇧⌘←→↑↓↩⌫⎋⇥".contains($0) }))
+        }
+    }
+}

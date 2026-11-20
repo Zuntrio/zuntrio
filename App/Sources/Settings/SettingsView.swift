@@ -22,7 +22,7 @@ struct SettingsView: View {
 
     private var general: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("General").font(.title2.weight(.semibold))
+            Text("General").font(.title2.weight(.semibold)).accessibilityAddTraits(.isHeader)
 
             Toggle("Launch Zuntrio at login", isOn: Binding(
                 get: { model.launchAtLogin != .disabled },
@@ -53,6 +53,7 @@ struct SettingsView: View {
             HStack(spacing: 6) {
                 Image(systemName: model.isTrusted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .foregroundStyle(model.isTrusted ? .green : .orange)
+                    .accessibilityHidden(true)
                 Text(model.isTrusted ? "Accessibility access granted" : "Accessibility access needed")
                 if !model.isTrusted {
                     Button("Open Accessibility Settings") { model.openAccessibilitySettings() }
@@ -67,7 +68,7 @@ struct SettingsView: View {
 
     private var disable: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Disable Shortcuts").font(.title2.weight(.semibold))
+            Text("Disable Shortcuts").font(.title2.weight(.semibold)).accessibilityAddTraits(.isHeader)
             Text("While off, Zuntrio's shortcuts go to the app you're using instead.")
                 .font(.callout).foregroundStyle(.secondary)
 
@@ -89,7 +90,7 @@ struct SettingsView: View {
                 }
             }
 
-            Text("Always off in these apps").font(.headline).padding(.top, 4)
+            Text("Always off in these apps").font(.headline).padding(.top, 4).accessibilityAddTraits(.isHeader)
             if model.disabledApps.isEmpty {
                 Text("None. Add an app here, or use Disable Shortcuts in the menu while it's in front.")
                     .font(.callout).foregroundStyle(.secondary)
@@ -111,7 +112,7 @@ struct SettingsView: View {
 
     private var shortcuts: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Shortcuts").font(.title2.weight(.semibold))
+            Text("Shortcuts").font(.title2.weight(.semibold)).accessibilityAddTraits(.isHeader)
 
             HStack {
                 Picker("Preset", selection: Binding(get: { model.preset }, set: { model.select($0) })) {
@@ -125,6 +126,7 @@ struct SettingsView: View {
             }
             Text("Click a shortcut to change it, then press the new keys. Esc cancels, ⌫ clears.")
                 .font(.callout).foregroundStyle(.secondary)
+                .accessibilityLabel("Choose a shortcut to change it, then press the new keys. Escape cancels, Delete clears.")
             if model.isReadOnly {
                 Text("These settings were saved by a newer version of Zuntrio. Changes won't be saved.")
                     .font(.callout).foregroundStyle(.orange)
@@ -132,7 +134,7 @@ struct SettingsView: View {
 
             ForEach(SettingsModel.sections, id: \.title) { section in
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(section.title).font(.headline).padding(.top, 6)
+                    Text(section.title).font(.headline).padding(.top, 6).accessibilityAddTraits(.isHeader)
                     ForEach(section.actions, id: \.self) { action in
                         if let row = model.rows[action] {
                             ShortcutRowView(row: row, model: model)
@@ -164,6 +166,8 @@ struct ShortcutRowView: View {
                         Text("Type shortcut…").frame(minWidth: 130)
                     }
                     .buttonStyle(.borderedProminent)
+                    .accessibilityLabel("Recording shortcut for \(row.action.displayName)")
+                    .accessibilityHint("Press the new keys. Escape cancels, Delete clears.")
                 } else {
                     Button { model.toggleRecording(row.action) } label: {
                         Text(row.shortcut ?? "Record Shortcut")
@@ -171,6 +175,9 @@ struct ShortcutRowView: View {
                             .frame(minWidth: 130)
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityLabel("Shortcut for \(row.action.displayName)")
+                    .accessibilityValue(row.spokenShortcut ?? "None")
+                    .accessibilityHint("Records a new shortcut.")
                 }
             }
             if let message = model.rowMessage, message.action == row.action {

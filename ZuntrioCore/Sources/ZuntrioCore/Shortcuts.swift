@@ -17,6 +17,16 @@ public struct ShortcutModifiers: OptionSet, Sendable, Hashable, Codable {
         if contains(.command) { s += "⌘" }
         return s
     }
+
+    /// Words for VoiceOver, in the same order: "Control Option Shift Command".
+    public var spokenNames: [String] {
+        var names: [String] = []
+        if contains(.control) { names.append("Control") }
+        if contains(.option) { names.append("Option") }
+        if contains(.shift) { names.append("Shift") }
+        if contains(.command) { names.append("Command") }
+        return names
+    }
 }
 
 /// A key plus modifiers. `keyCode` is a macOS virtual key code (the values of
@@ -51,6 +61,11 @@ public struct KeyCombo: Sendable, Hashable, Codable {
         modifiers.symbols + Self.keyName(keyCode)
     }
 
+    /// For VoiceOver, which reads glyphs such as ⌥ or ← poorly: "Option Command Left Arrow".
+    public var spokenDescription: String {
+        (modifiers.spokenNames + [Self.spokenKeyName(keyCode)]).joined(separator: " ")
+    }
+
     /// Why this combination can't be used as a global shortcut, if anything.
     public var validationIssue: ShortcutIssue? {
         // Plain keys or Shift/Option-only combos would hijack typing; macOS 15.0
@@ -71,6 +86,18 @@ public struct KeyCombo: Sendable, Hashable, Codable {
 
     public static func keyName(_ code: UInt16) -> String {
         keyNames[code] ?? "Key \(code)"
+    }
+
+    /// Spoken names for keys whose display name is a symbol.
+    static let spokenKeyNames: [UInt16: String] = [
+        24: "Equals", 27: "Minus", 30: "Right Bracket", 33: "Left Bracket", 36: "Return", 39: "Apostrophe",
+        41: "Semicolon", 42: "Backslash", 43: "Comma", 44: "Slash", 47: "Period", 48: "Tab",
+        50: "Grave Accent", 51: "Delete", 53: "Escape",
+        123: "Left Arrow", 124: "Right Arrow", 125: "Down Arrow", 126: "Up Arrow",
+    ]
+
+    public static func spokenKeyName(_ code: UInt16) -> String {
+        spokenKeyNames[code] ?? keyName(code)
     }
 }
 

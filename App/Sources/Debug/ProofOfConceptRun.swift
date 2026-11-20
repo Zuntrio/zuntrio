@@ -77,7 +77,9 @@ enum ProofOfConceptRun {
         for trusted in [false, true] {
             let model = OnboardingModel(
                 isTrusted: trusted,
-                examples: examples.map { ($0.displayName, shortcuts.combo(for: $0)?.displayString ?? "—") }
+                examples: examples.map {
+                    ($0.displayName, shortcuts.combo(for: $0)?.displayString ?? "—", shortcuts.combo(for: $0)?.spokenDescription ?? "no shortcut")
+                }
             )
             let view = OnboardingView(model: model).background(Color(nsColor: .windowBackgroundColor))
             let renderer = ImageRenderer(content: view)

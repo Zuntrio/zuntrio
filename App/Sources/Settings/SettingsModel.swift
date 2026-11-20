@@ -10,6 +10,8 @@ final class SettingsModel {
     struct Row: Identifiable, Equatable {
         let action: WindowAction
         var shortcut: String?
+        /// The shortcut in words, for VoiceOver ("Option Command C").
+        var spokenShortcut: String?
         var isEnabled: Bool
         var warning: String?
         var id: WindowAction { action }
@@ -75,6 +77,7 @@ final class SettingsModel {
             rows[action] = Row(
                 action: action,
                 shortcut: settings.combo(for: action)?.displayString,
+                spokenShortcut: settings.combo(for: action)?.spokenDescription,
                 isEnabled: settings.isEnabled(action),
                 warning: warning
             )
