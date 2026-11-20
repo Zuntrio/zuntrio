@@ -133,6 +133,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             menu.addItem(item("Zuntrio \(update.version.displayName) is available…", #selector(openAvailableUpdate)))
             menu.addItem(.separator())
         }
+        menu.addItem(item("Copy Diagnostics…", #selector(copyDiagnostics), symbol: "stethoscope"))
         #if DEBUG
         menu.addItem(item("Show Test Window", #selector(showFixture)))
         #endif
@@ -296,6 +297,11 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             let outcome = await updates.check()
             UpdatePrompt.show(outcome)
         }
+    }
+
+    @objc private func copyDiagnostics() {
+        let report = Diagnostics.report(shortcuts: shortcuts, pause: pause, monitor: monitor, updates: updates, runner: runner)
+        DiagnosticsPrompt.show(report)
     }
 
     @objc private func openAvailableUpdate() {
