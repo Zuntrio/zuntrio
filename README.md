@@ -141,10 +141,26 @@ Shortcuts** in the menu, or in Settings:
 While shortcuts are off, the key presses go to the app instead, and the menu-bar icon is
 dimmed. The window actions stay available from the menu.
 
-## When a window doesn't move
+## Troubleshooting
+
+### A shortcut does nothing
+
+- **Is the menu-bar icon dimmed?** Open the Zuntrio menu. It says either **Accessibility access
+  needed** (choose **Grant Accessibility Access…**) or that shortcuts are off. If they're off for a
+  while, choose **Turn Shortcuts Back On**. If they're off in the app in front, uncheck that app
+  under **Disable Shortcuts** (see [Disabling shortcuts](#disabling-shortcuts)).
+- **Does the menu say "… shortcuts unavailable — see Settings"?** Another app registered the
+  same keys first, or they're also a macOS keyboard shortcut. Settings shows which ones; record
+  a different shortcut or switch to the **Alternative** preset.
+- **Want ⌥⌘← / ⌥⌘→ to switch browser tabs again?** They're Spectacle's defaults for left and
+  right half, so Zuntrio takes them. The **Alternative** preset (⌃⌥) leaves them to the browser.
+- **Can't see the menu-bar icon?** On Macs with a notch, icons can be hidden behind it when
+  the menu bar is full. Quit a few other menu-bar apps to make room.
+
+### A window doesn't move
 
 Zuntrio checks where each window actually ended up and never reports success it didn't get.
-You'll hear a beep, and the menu's "Last:" line explains why:
+You'll hear a beep, and a line near the bottom of the Zuntrio menu explains why:
 
 - **The app limited the size.** Many apps have a minimum or maximum window size.
   Terminal-style apps resize in whole rows and columns.
@@ -152,6 +168,21 @@ You'll hear a beep, and the menu's "Last:" line explains why:
   full-screen windows aren't moved.
 - **App isn't responding.** Zuntrio gives up after half a second and stays responsive.
 - **Some apps don't support Accessibility fully** and can't be moved at all.
+
+### Accessibility is on, but Zuntrio says it needs access
+
+macOS ties the permission to the exact copy of the app. After replacing Zuntrio with a copy
+signed differently (for example a build of your own), the switch can stay on for the old copy.
+Select **Zuntrio** in System Settings → Privacy & Security → Accessibility, click **–**, then
+open Zuntrio again and grant access. Or run `tccutil reset Accessibility app.zuntrio.Zuntrio`
+in Terminal first.
+
+### Reporting a problem
+
+Choose **Copy Diagnostics…** in the Zuntrio menu (0.1.0 beta 2 or later). It shows exactly
+what will be copied: versions, Mac model, display layout and the last result, with no window
+titles, app names or personal data. Then [open an issue](https://github.com/Zuntrio/zuntrio/issues/new/choose)
+and paste it in.
 
 ## Compatibility
 
