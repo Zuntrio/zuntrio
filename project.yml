@@ -58,7 +58,34 @@ targets:
           ONLY_ACTIVE_ARCH: NO
           # No get-task-allow entitlement in release builds: notarization rejects it.
           CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+  # Accessibility UI tests (VoiceOver labels and values). Run with the ZuntrioUITests scheme;
+  # the app runs in UI-test mode (no hotkeys, throwaway settings).
+  ZuntrioUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - UITests
+    dependencies:
+      - target: Zuntrio
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.zuntrio.ZuntrioUITests
+        TEST_TARGET_NAME: Zuntrio
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+        SWIFT_STRICT_CONCURRENCY: complete
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
 schemes:
+  ZuntrioUITests:
+    build:
+      targets:
+        Zuntrio: all
+        ZuntrioUITests: [test]
+    test:
+      targets:
+        - ZuntrioUITests
   Zuntrio:
     build:
       targets:

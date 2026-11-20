@@ -57,3 +57,27 @@ jobs:
           if codesign -d --entitlements - "$APP" 2>&1 | grep -q get-task-allow; then echo "::error::Release build has get-task-allow"; exit 1; fi
           if strings -a "$BIN" | grep -q -- '--poc-'; then echo "::error::debug test harness found in Release build"; exit 1; fi
           echo "Release app checks passed"
+
+  accessibility-ui-tests:
+    # Not a required check yet: it becomes one once it has proven stable on GitHub's runners.
+    name: Accessibility UI tests
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -1)
+          [ -z "$XCODE" ] && XCODE=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: UI tests (VoiceOver labels and values)
+        run: xcodebuild -project Zuntrio.xcodeproj -scheme ZuntrioUITests -destination 'platform=macOS' -derivedDataPath build test
