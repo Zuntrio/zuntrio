@@ -2,6 +2,7 @@ import XCTest
 
 /// What VoiceOver reads in Settings and the welcome window. The app runs in UI-test
 /// mode: no global hotkeys, throwaway settings, and only the requested window opens.
+@MainActor
 final class AccessibilityUITests: XCTestCase {
     /// Every window action, as shown in Settings, with its Spectacle default spoken.
     private static let spectacleDefaults: [(String, String)] = [
@@ -17,11 +18,8 @@ final class AccessibilityUITests: XCTestCase {
 
     private let glyphs = CharacterSet(charactersIn: "⌃⌥⇧⌘←→↑↓↩⌫⎋⇥")
 
-    override func setUp() {
-        continueAfterFailure = true
-    }
-
     private func launch(showing window: String) -> XCUIApplication {
+        continueAfterFailure = true
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--ui-testing-show", window]
         app.launch()
