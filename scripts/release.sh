@@ -7,8 +7,8 @@
 #   scripts/release.sh build <version>     On an up-to-date main: test, build, sign, notarize, staple,
 #                                          verify, zip, and create a DRAFT GitHub release.
 #
-# <version> is X.Y.Z, X.Y.Z-beta.N or X.Y.Z-rc.N. The tag is v<version>. MARKETING_VERSION holds X.Y.Z;
-# the build number goes up by one with every prepare.
+# <version> is X.Y.Z, X.Y.Z-beta.N or X.Y.Z-rc.N. The tag is v<version>. MARKETING_VERSION holds X.Y.Z,
+# App/Sources/App/ReleaseInfo.swift the full version; the build number goes up by one with every prepare.
 #
 # Needs Xcode 27 or later, xcodegen, gh (signed in), a "Developer ID Application" identity in the
 # keychain, and a notarytool keychain profile (xcrun notarytool store-credentials).
@@ -45,6 +45,9 @@ case $version in *-*) prerelease=yes ;; *) prerelease=no ;; esac
 current_marketing=$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"$/\1/p' project.yml)
 current_build=$(sed -n 's/^ *CURRENT_PROJECT_VERSION: "\(.*\)"$/\1/p' project.yml)
 [ -n "$current_marketing" ] && [ -n "$current_build" ] || die "Couldn't read the version from project.yml."
+release_info=App/Sources/App/ReleaseInfo.swift
+current_release=$(sed -n 's/^ *static let version = "\(.*\)"$/\1/p' "$release_info")
+[ -n "$current_release" ] || die "Couldn't read the version from $release_info."
 
 for tool in git gh xcodegen; do
   command -v "$tool" >/dev/null 2>&1 || die "$tool is not installed."
@@ -78,13 +81,14 @@ prepare() {
     -e "s/^\( *MARKETING_VERSION: \)\"$current_marketing\"$/\1\"$base\"/" \
     -e "s/^\( *CURRENT_PROJECT_VERSION: \)\"$current_build\"$/\1\"$build\"/" \
     project.yml
+  sed -i '' -e "s/^\( *static let version = \)\".*\"$/\1\"$version\"/" "$release_info"
   git diff --stat
   git commit -q -am "Bump version to $version (build $build)"
 
   step "Pushing $branch and opening a pull request"
   git push -q -u origin "$branch"
   gh pr create -R "$REPO" --base main --head "$branch" --title "Prepare $version" \
-    --body "Bumps MARKETING_VERSION to $base and the build number to $build for $version."
+    --body "Bumps MARKETING_VERSION to $base, the build number to $build and ReleaseInfo.version to $version."
 
   printf '\nNext: merge the pull request once CI passes, update main, then run:\n  scripts/release.sh build %s\n' "$version"
 }
@@ -95,6 +99,8 @@ build() {
   require_unreleased
   [ "$current_marketing" = "$base" ] \
     || die "project.yml has MARKETING_VERSION $current_marketing, expected $base. Run: scripts/release.sh prepare $version"
+  [ "$current_release" = "$version" ] \
+    || die "$release_info has version $current_release, expected $version. Run: scripts/release.sh prepare $version"
 
   local xcode_major
   xcode_major=$(xcodebuild -version | awk 'NR == 1 { split($2, v, "."); print v[1] }')

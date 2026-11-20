@@ -10,6 +10,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let shortcuts: ShortcutController
     private let pause: PauseController
     private let monitor: AccessibilityMonitor
+    private let updates: UpdateChecker
     private let showWelcome: () -> Void
     private let showSettings: () -> Void
     /// The app that was in front when the menu opened (target of "Disable in …").
@@ -30,11 +31,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     ]
 
     init(runner: WindowActionRunner, shortcuts: ShortcutController, pause: PauseController,
-         monitor: AccessibilityMonitor, showWelcome: @escaping () -> Void, showSettings: @escaping () -> Void) {
+         monitor: AccessibilityMonitor, updates: UpdateChecker,
+         showWelcome: @escaping () -> Void, showSettings: @escaping () -> Void) {
         self.runner = runner
         self.shortcuts = shortcuts
         self.pause = pause
         self.monitor = monitor
+        self.updates = updates
         self.showWelcome = showWelcome
         self.showSettings = showSettings
         super.init()
@@ -80,6 +83,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         // App items first (owner's order).
         menu.addItem(item("Welcome & Permissions…", #selector(openWelcome), symbol: "checkmark.shield"))
         menu.addItem(item("About Zuntrio", #selector(showAbout), symbol: "info.circle"))
+        menu.addItem(item("Check for Updates…", #selector(checkForUpdates), symbol: "arrow.down.circle"))
         let settingsItem = item("Settings…", #selector(openSettings), symbol: "gearshape")
         settingsItem.keyEquivalent = ","
         menu.addItem(settingsItem)
@@ -125,6 +129,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
 
         menu.addItem(.separator())
+        if let update = updates.available {
+            menu.addItem(item("Zuntrio \(update.version.displayName) is available…", #selector(openAvailableUpdate)))
+            menu.addItem(.separator())
+        }
         #if DEBUG
         menu.addItem(item("Show Test Window", #selector(showFixture)))
         #endif
@@ -279,7 +287,20 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     @objc private func showAbout() {
         NSApp.activate()
-        NSApp.orderFrontStandardAboutPanel(nil)
+        // Show the beta or RC stage, which Info.plist's short version can't carry.
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationVersion: ReleaseInfo.displayVersion])
+    }
+
+    @objc private func checkForUpdates() {
+        Task { @MainActor in
+            let outcome = await updates.check()
+            UpdatePrompt.show(outcome)
+        }
+    }
+
+    @objc private func openAvailableUpdate() {
+        guard let update = updates.available else { return }
+        NSWorkspace.shared.open(update.url)
     }
 
     #if DEBUG

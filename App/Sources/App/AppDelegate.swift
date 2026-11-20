@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotKeys = HotKeyCenter()
     private let monitor = AccessibilityMonitor()
     private let pause = PauseController()
+    private let updates = UpdateChecker()
     private var shortcuts: ShortcutController?
     private var statusMenu: StatusMenuController?
     private var onboarding: OnboardingWindowController?
@@ -22,10 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let onboarding = OnboardingWindowController(monitor: monitor, shortcuts: shortcuts)
         self.onboarding = onboarding
-        let settings = SettingsWindowController(model: SettingsModel(shortcuts: shortcuts, pause: pause, monitor: monitor))
+        let settings = SettingsWindowController(model: SettingsModel(shortcuts: shortcuts, pause: pause, monitor: monitor, updates: updates))
         self.settings = settings
         let statusMenu = StatusMenuController(
-            runner: runner, shortcuts: shortcuts, pause: pause, monitor: monitor,
+            runner: runner, shortcuts: shortcuts, pause: pause, monitor: monitor, updates: updates,
             showWelcome: { onboarding.show() }, showSettings: { settings.show() }
         )
         self.statusMenu = statusMenu
@@ -52,6 +53,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if self.onboarding?.isVisible == false { self.onboarding?.show() }
         }
 
+        // Sends nothing unless the user turned on automatic checks (ADR-0007).
+        updates.start()
+
         if !monitor.isTrusted {
             Log.permissions.info("Accessibility not granted at launch")
         }
@@ -68,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ProofOfConceptRun.writeShortcutReportIfRequested(arguments: CommandLine.arguments, shortcuts: shortcuts, pause: pause)
         ProofOfConceptRun.renderOnboardingIfRequested(arguments: CommandLine.arguments, shortcuts: shortcuts)
         ProofOfConceptRun.renderSettingsIfRequested(arguments: CommandLine.arguments, settings: settings)
+        ProofOfConceptRun.writeUpdateCheckIfRequested(arguments: CommandLine.arguments, updates: updates)
         ProofOfConceptRun.startIfRequested(arguments: CommandLine.arguments, runner: runner)
         #endif
     }

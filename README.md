@@ -24,8 +24,8 @@ Zuntrio exists so that workflow doesn't disappear. It aims to be:
 - **native and maintained:** a modern Swift app for Apple Silicon and Intel, built for
   current versions of macOS;
 - **free and open:** no subscription, account, ads or paywall, and MIT-licensed source;
-- **trustworthy:** no network access or telemetry, and it tells you honestly when an app
-  won't let a window move.
+- **trustworthy:** no network connections unless you check for updates, no telemetry, and it
+  tells you honestly when an app won't let a window move.
 
 ## Requirements and support
 
@@ -169,7 +169,10 @@ work on your Intel Mac, please [let us know](https://github.com/Zuntrio/zuntrio/
 
 ## Privacy
 
-- No network connections, no telemetry or analytics, no account.
+- No network connections unless you check for updates: a single request to GitHub, made only
+  when you choose **Check for Updates…** or turn on automatic checks in Settings (off by default).
+  Nothing about you or your Mac is sent, and Zuntrio never downloads or installs updates itself.
+- No telemetry or analytics, no account.
 - Zuntrio never reads window contents, window titles, document names or keystrokes, and
   doesn't track which apps you use.
 - Settings (your shortcuts, and any apps where you've turned them off) are stored only on
@@ -190,7 +193,7 @@ Installed with Homebrew? Turn off **Launch at login** if you turned it on, then 
 4. Optionally, remove everything Zuntrio left on your Mac. Run these in Terminal:
 
    ```sh
-   # Your settings: shortcuts and disabled apps (~/Library/Preferences/app.zuntrio.Zuntrio.plist)
+   # Your settings: shortcuts, disabled apps, update checks (~/Library/Preferences/app.zuntrio.Zuntrio.plist)
    defaults delete app.zuntrio.Zuntrio
 
    # Zuntrio's entry in System Settings → Privacy & Security → Accessibility

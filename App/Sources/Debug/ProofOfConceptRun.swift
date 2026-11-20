@@ -112,6 +112,28 @@ enum ProofOfConceptRun {
         }
     }
 
+    /// `--poc-update-check <file>`: runs one real update check against GitHub and
+    /// writes the outcome, plus what an older beta would have been offered.
+    static func writeUpdateCheckIfRequested(arguments: [String], updates: UpdateChecker) {
+        guard let output = value(after: "--poc-update-check", in: arguments) else { return }
+        Task { @MainActor in
+            var document: [String: Any] = ["current": ReleaseInfo.version]
+            switch await updates.check() {
+            case .available(let update): document["outcome"] = "available \(update.version) \(update.url.absoluteString)"
+            case .upToDate: document["outcome"] = "upToDate"
+            case .failed: document["outcome"] = "failed"
+            }
+            if let data = try? await GitHubReleaseFetcher().fetchReleases(),
+               let releases = try? UpdatePolicy.decodeReleases(data),
+               let older = ReleaseVersion("0.1.0-beta.0") {
+                document["releaseTags"] = releases.map(\.tagName)
+                document["offeredTo0.1.0-beta.0"] = UpdatePolicy.newestUpdate(for: older, in: releases)?.version.description ?? "nothing"
+            }
+            write(document, to: output)
+            NSApp.terminate(nil)
+        }
+    }
+
     private static func capture(_ window: NSWindow, to directory: String, name: String) {
         guard let view = window.contentView,
               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
