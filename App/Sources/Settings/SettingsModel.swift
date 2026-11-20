@@ -29,6 +29,7 @@ final class SettingsModel {
     private let shortcuts: ShortcutController
     private let pause: PauseController
     private let monitor: AccessibilityMonitor
+    private let updates: UpdateChecker
     private var keyMonitor: Any?
 
     // Disable shortcuts
@@ -45,19 +46,19 @@ final class SettingsModel {
     private(set) var launchAtLogin: LaunchAtLogin.State = .disabled
     private(set) var launchAtLoginError: String?
     private(set) var isTrusted = false
+    private(set) var checksForUpdates = false
 
-    init(shortcuts: ShortcutController, pause: PauseController, monitor: AccessibilityMonitor) {
+    init(shortcuts: ShortcutController, pause: PauseController, monitor: AccessibilityMonitor, updates: UpdateChecker) {
         self.shortcuts = shortcuts
         self.pause = pause
         self.monitor = monitor
+        self.updates = updates
         reload()
     }
 
     var version: String {
-        let info = Bundle.main.infoDictionary
-        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
-        let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "\(short) (\(build))"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        return "\(ReleaseInfo.displayVersion) (\(build))"
     }
 
     func reload() {
@@ -79,6 +80,7 @@ final class SettingsModel {
             )
         }
         launchAtLogin = LaunchAtLogin.state
+        checksForUpdates = updates.checksAutomatically
         pausedUntil = pause.isPausedNow ? pause.settings.pausedUntil : nil
         disabledApps = pause.settings.disabledApps
         monitor.refresh()
@@ -86,6 +88,11 @@ final class SettingsModel {
     }
 
     // MARK: - Shortcuts
+
+    func setChecksForUpdates(_ enabled: Bool) {
+        updates.checksAutomatically = enabled
+        checksForUpdates = enabled
+    }
 
     func select(_ newPreset: ShortcutPreset) {
         stopRecording()

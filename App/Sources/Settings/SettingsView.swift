@@ -39,6 +39,17 @@ struct SettingsView: View {
                 Text(error).font(.callout).foregroundStyle(.red)
             }
 
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Check for updates automatically", isOn: Binding(
+                    get: { model.checksForUpdates },
+                    set: { model.setChecksForUpdates($0) }
+                ))
+                Text("Once a day, Zuntrio asks GitHub for the newest version. Nothing about you or your Mac is sent. Zuntrio never downloads or installs updates.")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 20)
+            }
+
             HStack(spacing: 6) {
                 Image(systemName: model.isTrusted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .foregroundStyle(model.isTrusted ? .green : .orange)

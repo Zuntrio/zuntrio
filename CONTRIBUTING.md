@@ -84,7 +84,8 @@ open -n -g "$APP" --args --poc-run leftHalf,maximize,undo \
   that don't move as expected.
 - **No false success:** read the window frame back after setting it, and report any mismatch
   or error.
-- **Privacy:** no network access, telemetry or analytics. Never log window titles, document
+- **Privacy:** no telemetry or analytics, and no network access apart from the opt-in update
+  check (`App/Sources/Updates/`), which sends nothing about the user or the Mac. Never log window titles, document
   names, app names or keystrokes.
 - **Code safety:** no force unwraps, `try!` or empty `catch` blocks in app code.
 - **Dependencies:** keep them to a minimum. Discuss any new one in an issue first.
