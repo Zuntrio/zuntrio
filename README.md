@@ -56,6 +56,24 @@ that keeps working after that change.
 3. Open Zuntrio. Its icon appears in the menu bar. There is no Dock icon.
 4. Grant Accessibility access when asked (see below).
 
+Or install it with [Homebrew](https://brew.sh):
+
+```sh
+brew install --cask zuntrio/tap/zuntrio
+```
+
+Or with curl (or `wget -qO-` in place of `curl -fsSL`):
+
+```sh
+curl -fsSL https://zuntrio.app/install.sh | bash
+```
+
+The [script](https://zuntrio.app/install.sh) downloads the release from GitHub, checks its SHA-256
+checksum, checks that the app is signed by Zuntrio's Developer ID and notarized by Apple, and moves it
+to Applications. Run it again to update.
+
+Then open Zuntrio and grant Accessibility access, as in steps 3 and 4.
+
 To build it yourself, see [Building from source](#building-from-source).
 
 ## Accessibility permission
@@ -160,6 +178,9 @@ work on your Intel Mac, please [let us know](https://github.com/Zuntrio/zuntrio/
   sizes, and error codes.
 
 ## Uninstall
+
+Installed with Homebrew? Turn off **Launch at login** if you turned it on, then run
+`brew uninstall --cask zuntrio`. Add `--zap` to also delete your settings. Otherwise:
 
 1. If you turned on **Launch at login**, turn it off first: Zuntrio menu → **Settings…**. If
    you've already removed the app, delete the entry in System Settings → General → Login Items
