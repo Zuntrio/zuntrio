@@ -100,3 +100,16 @@ The check must pass before a pull request can be merged.
 - Keep each pull request small and focused.
 - Describe what changed, why, and how you tested it.
 - Make sure `swift test --package-path ZuntrioCore` and the Debug build pass.
+
+## Releases (maintainers)
+
+Releases are built locally with Xcode 27 by `scripts/release.sh`, which needs a Developer ID identity
+and a notarytool keychain profile. Run `scripts/release.sh` without arguments for details.
+
+```sh
+scripts/release.sh prepare 0.1.0-beta.2   # bump project.yml on a branch, open a pull request
+scripts/release.sh check 0.1.0-beta.2     # optional dry run on main: tests, signed build, checks
+scripts/release.sh build 0.1.0-beta.2     # after the pull request is merged: notarize, draft release
+```
+
+The GitHub release stays a draft until a maintainer publishes it.
