@@ -4,7 +4,7 @@ import ZuntrioCore
 /// carry (CFBundleShortVersionString stays X.Y.Z). `scripts/release.sh prepare`
 /// updates it, and `build` checks that it matches the tag.
 enum ReleaseInfo {
-    static let version = "0.1.0-beta.1"
+    static let version = "0.1.0-beta.2"
 
     static var current: ReleaseVersion? { ReleaseVersion(version) }
 
