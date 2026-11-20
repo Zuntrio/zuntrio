@@ -44,7 +44,10 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     func show() {
         model.isTrusted = monitor.isTrusted
         // Shortcuts may have changed in Settings since launch.
-        model.examples = Self.exampleActions.map { ($0.displayName, shortcuts.combo(for: $0)?.displayString ?? "—") }
+        model.examples = Self.exampleActions.map { action in
+            let combo = shortcuts.combo(for: action)
+            return (action.displayName, combo?.displayString ?? "—", combo?.spokenDescription ?? "no shortcut")
+        }
         let window = self.window ?? makeWindow()
         self.window = window
         monitor.setPolling(!model.isTrusted)

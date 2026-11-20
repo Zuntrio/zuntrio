@@ -6,11 +6,12 @@ import ZuntrioCore
 @Observable
 final class OnboardingModel {
     var isTrusted: Bool
-    var examples: [(name: String, shortcut: String)]
+    /// `spoken` is the shortcut in words, for VoiceOver.
+    var examples: [(name: String, shortcut: String, spoken: String)]
     var openSettings: () -> Void = {}
     var finish: () -> Void = {}
 
-    init(isTrusted: Bool, examples: [(name: String, shortcut: String)]) {
+    init(isTrusted: Bool, examples: [(name: String, shortcut: String, spoken: String)]) {
         self.isTrusted = isTrusted
         self.examples = examples
     }
@@ -31,6 +32,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Welcome to Zuntrio")
                         .font(.largeTitle.weight(.semibold))
+                        .accessibilityAddTraits(.isHeader)
                     Text("Move and resize windows with your keyboard. Zuntrio lives in the menu bar.")
                         .foregroundStyle(.secondary)
                 }
@@ -39,13 +41,15 @@ struct OnboardingView: View {
             permissionCard
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Try it").font(.headline)
+                Text("Try it").font(.headline).accessibilityAddTraits(.isHeader)
                 Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 6) {
                     ForEach(model.examples, id: \.name) { example in
                         GridRow {
                             Text(example.name)
                             Text(example.shortcut).font(.body.monospaced()).foregroundStyle(.secondary)
                         }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(example.name): \(example.spoken)")
                     }
                 }
                 Text("All actions and shortcut options are in the Zuntrio menu-bar menu.")
@@ -53,10 +57,11 @@ struct OnboardingView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Privacy").font(.headline)
+                Text("Privacy").font(.headline).accessibilityAddTraits(.isHeader)
                 Text("""
                     Zuntrio only reads and changes the position and size of the window you're working in. \
-                    It never reads window contents, titles or keystrokes, and it makes no network connections.
+                    It never reads window contents, titles or keystrokes, and it makes no network connections \
+                    unless you check for updates.
                     """)
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -78,6 +83,7 @@ struct OnboardingView: View {
                 Image(systemName: model.isTrusted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .foregroundStyle(model.isTrusted ? .green : .orange)
                     .font(.title2)
+                    .accessibilityHidden(true)
                 Text(model.isTrusted ? "Accessibility access granted" : "Accessibility access needed")
                     .font(.headline)
             }
