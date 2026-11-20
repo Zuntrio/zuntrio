@@ -73,6 +73,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ProofOfConceptRun.renderOnboardingIfRequested(arguments: CommandLine.arguments, shortcuts: shortcuts)
         ProofOfConceptRun.renderSettingsIfRequested(arguments: CommandLine.arguments, settings: settings)
         ProofOfConceptRun.writeUpdateCheckIfRequested(arguments: CommandLine.arguments, updates: updates)
+        ProofOfConceptRun.writeDiagnosticsIfRequested(
+            arguments: CommandLine.arguments, shortcuts: shortcuts, pause: pause,
+            monitor: monitor, updates: updates, runner: runner
+        )
         ProofOfConceptRun.startIfRequested(arguments: CommandLine.arguments, runner: runner)
         #endif
     }

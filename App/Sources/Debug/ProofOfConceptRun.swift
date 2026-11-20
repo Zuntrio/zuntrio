@@ -112,6 +112,21 @@ enum ProofOfConceptRun {
         }
     }
 
+    /// `--poc-diagnostics <file>`: writes the "Copy Diagnostics…" text without showing the dialog.
+    static func writeDiagnosticsIfRequested(
+        arguments: [String], shortcuts: ShortcutController, pause: PauseController,
+        monitor: AccessibilityMonitor, updates: UpdateChecker, runner: WindowActionRunner
+    ) {
+        guard let output = value(after: "--poc-diagnostics", in: arguments) else { return }
+        let text = Diagnostics.report(shortcuts: shortcuts, pause: pause, monitor: monitor, updates: updates, runner: runner).text
+        do {
+            try text.write(toFile: output, atomically: true, encoding: .utf8)
+        } catch {
+            Log.actions.error("Writing diagnostics failed: \(error.localizedDescription, privacy: .public)")
+        }
+        NSApp.terminate(nil)
+    }
+
     /// `--poc-update-check <file>`: runs one real update check against GitHub and
     /// writes the outcome, plus what an older beta would have been offered.
     static func writeUpdateCheckIfRequested(arguments: [String], updates: UpdateChecker) {

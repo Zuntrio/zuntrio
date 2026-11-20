@@ -128,11 +128,13 @@ final class UpdateChecker {
         }
     }
 
-    /// Whether this copy was installed with Homebrew (it keeps a Caskroom entry).
+    /// Whether this copy was installed with Homebrew: the cask keeps a Caskroom entry
+    /// and installs to /Applications/Zuntrio.app, so a copy elsewhere doesn't count.
     static var installedWithHomebrew: Bool {
-        ["/opt/homebrew/Caskroom/zuntrio", "/usr/local/Caskroom/zuntrio"].contains {
-            FileManager.default.fileExists(atPath: $0)
-        }
+        Bundle.main.bundlePath == "/Applications/Zuntrio.app"
+            && ["/opt/homebrew/Caskroom/zuntrio", "/usr/local/Caskroom/zuntrio"].contains {
+                FileManager.default.fileExists(atPath: $0)
+            }
     }
 
     static let releasesPage = URL(string: "https://github.com/Zuntrio/zuntrio/releases")
